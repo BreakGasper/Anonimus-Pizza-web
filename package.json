@@ -10,7 +10,8 @@
     "test:rules": "firebase emulators:exec --only firestore --project demo-anonimus-pizza \"node tests/firestore.rules.test.mjs\""
   },
   "dependencies": {
-    "vue": "^3.5.13"
+    "vue": "^3.5.13",
+    "vue-router": "^4.6.5"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
