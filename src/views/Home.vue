@@ -1,7 +1,8 @@
 <script setup>
 import Logo from '../components/Logo.vue'
-import { ESPECIALIDADES } from '../data/menu.js'
-import { imgEspecialidad, imgBase } from '../data/imagenes.js'
+import { money } from '../data/menu.js'
+import { imgBase } from '../data/imagenes.js'
+import { favoritas, enPromocion, precioFinal, hayPromo, fotoDe, rutaDe } from '../store/menu.js'
 </script>
 
 <template>
@@ -18,13 +19,27 @@ import { imgEspecialidad, imgBase } from '../data/imagenes.js'
     <img :src="imgBase" alt="" class="hero-pizza" width="420" height="420" />
   </section>
 
-  <section class="seccion">
+  <section v-if="enPromocion.length" class="seccion">
+    <div class="seccion-cab"><h2>🏷️ En promoción</h2></div>
+    <div class="carrusel">
+      <router-link v-for="e in enPromocion" :key="e.id" :to="rutaDe(e)" class="fav promo-fav">
+        <span class="fav-etq">Promo</span>
+        <img v-if="fotoDe(e)" :src="fotoDe(e)" :alt="e.nombre" loading="lazy" width="112" height="112" />
+        <span v-else class="fav-emoji" aria-hidden="true">{{ e.emoji || '🍕' }}</span>
+        <b>{{ e.nombre }}</b>
+        <span class="desc"><s class="tachado">{{ money(e.precio) }}</s> <b class="ahora">{{ money(precioFinal(e)) }}</b></span>
+      </router-link>
+    </div>
+  </section>
+
+  <section v-if="favoritas.length" class="seccion">
     <div class="seccion-cab"><h2>Las favoritas</h2><router-link to="/especialidades">Ver todas →</router-link></div>
     <div class="carrusel">
-      <router-link v-for="e in ESPECIALIDADES" :key="e.id" to="/especialidades" class="fav">
-        <img :src="imgEspecialidad(e.id)" :alt="'Pizza ' + e.nombre" loading="lazy" width="112" height="112" />
+      <router-link v-for="e in favoritas" :key="e.id" :to="rutaDe(e)" class="fav">
+        <img v-if="fotoDe(e)" :src="fotoDe(e)" :alt="e.nombre" loading="lazy" width="112" height="112" />
+        <span v-else class="fav-emoji" aria-hidden="true">{{ e.emoji || '🍕' }}</span>
         <b>{{ e.nombre }}</b>
-        <span class="desc">desde ${{ e.precio }}</span>
+        <span class="desc">{{ hayPromo(e) ? '' : 'desde ' }}{{ money(precioFinal(e)) }}</span>
       </router-link>
     </div>
   </section>

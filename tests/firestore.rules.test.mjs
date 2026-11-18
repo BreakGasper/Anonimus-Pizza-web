@@ -58,6 +58,16 @@ await t('no se puede leer el registro de otro', assertFails(getDoc(doc(sinLista,
 await t('visitante anónimo NO lee /admins', assertFails(getDoc(doc(anon, 'admins/uadmin'))))
 await t('los visitantes siguen creando pedidos válidos', assertSucceeds(setDoc(doc(anon, 'pedidos/nuevo1'), valido())))
 
+const menu = () => ({ items: [{ id: 'a', tipo: 'especialidad', nombre: 'Prueba', precio: 100 }] })
+await t('cualquiera lee el menú (config/menu)', assertSucceeds(getDoc(doc(anon, 'config/menu'))))
+await t('visitante NO escribe el menú', assertFails(setDoc(doc(anon, 'config/menu'), menu())))
+await t('cuenta fuera de /admins NO escribe el menú', assertFails(setDoc(doc(sinLista, 'config/menu'), menu())))
+await t('admin de Google escribe el menú', assertSucceeds(setDoc(doc(admin, 'config/menu'), menu())))
+await t('cuenta de /admins escribe el menú', assertSucceeds(setDoc(doc(listaAdmin, 'config/menu'), menu())))
+await t('el menú debe traer una lista items', assertFails(setDoc(doc(listaAdmin, 'config/menu'), { items: 'x' })))
+await t('el menú no puede pasar de 150 elementos', assertFails(setDoc(doc(listaAdmin, 'config/menu'), { items: Array.from({ length: 151 }, (_, i) => ({ id: String(i) })) })))
+await t('otros documentos de config siguen cerrados para escritura', assertFails(setDoc(doc(anon, 'config/otro'), menu())))
+
 await env.cleanup()
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodas las pruebas pasaron')
 process.exit(fallos ? 1 : 0)

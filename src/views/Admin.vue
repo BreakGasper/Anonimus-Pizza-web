@@ -7,6 +7,7 @@ import { db } from '../firebase/db.js'
 import { money } from '../data/menu.js'
 import Logo from '../components/Logo.vue'
 import Icono from '../components/Icono.vue'
+import AdminMenu from '../components/AdminMenu.vue'
 
 /* ---------- Sesión ---------- */
 const usuario = ref(null)
@@ -211,6 +212,7 @@ async function borrar(p) {
         <nav class="adm-tabs" aria-label="Secciones">
           <button :class="{ on: pestana === 'pedidos' }" @click="pestana = 'pedidos'">Pedidos <b v-if="nuevos" class="punto">{{ nuevos }}</b></button>
           <button :class="{ on: pestana === 'resumen' }" @click="pestana = 'resumen'">Resumen</button>
+          <button :class="{ on: pestana === 'menu' }" @click="pestana = 'menu'">Menú</button>
         </nav>
 
         <!-- Pedidos -->
@@ -252,7 +254,7 @@ async function borrar(p) {
         </section>
 
         <!-- Resumen -->
-        <section v-else>
+        <section v-else-if="pestana === 'resumen'">
           <div class="resumen">
             <div class="tarjeta"><b>{{ resumenHoy.pedidos }}</b>Pedidos de hoy</div>
             <div class="tarjeta"><b>{{ money(resumenHoy.ventas) }}</b>Ventas de hoy</div>
@@ -275,6 +277,9 @@ async function borrar(p) {
           </div>
           <p class="desc">Las cifras no incluyen pedidos cancelados. Se calculan con los últimos 500 pedidos.</p>
         </section>
+
+        <!-- Menú de la tienda -->
+        <AdminMenu v-else />
       </template>
     </template>
   </div>

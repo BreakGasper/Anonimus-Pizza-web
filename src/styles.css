@@ -216,3 +216,10 @@ label.campo { display: block; margin-bottom: 12px; font-weight: 600; font-size: 
 @media (min-width: 720px) {
   .resumen-pedido { order: 0; margin-bottom: 0; position: sticky; top: calc(var(--cab-h) + 16px); }
 }
+
+.tachado { color: var(--suave); font: 500 .85rem var(--cuerpo); margin-right: 6px; }
+.prod-etiqueta { background: var(--rojo); }
+.promo-fav { position: relative; border-color: #6b2a22; }
+.fav-etq { position: absolute; top: 8px; left: 8px; background: var(--rojo); color: #fff; font-size: .68rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; z-index: 1; }
+.fav-emoji { font-size: 3.4rem; display: grid; place-items: center; width: 112px; height: 112px; margin: 0 auto; }
+.fav .ahora { display: inline; font: 800 1.1rem var(--display); color: var(--ambar); margin: 0; text-transform: none; }

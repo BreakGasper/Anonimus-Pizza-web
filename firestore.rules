@@ -42,6 +42,14 @@ service cloud.firestore {
       allow read, update, delete: if esAdmin();
     }
 
+    // Menú de la tienda (un solo documento: config/menu). Lo lee cualquiera; solo un admin lo cambia.
+    match /config/{documento} {
+      allow read: if true;
+      allow write: if esAdmin()
+                   && request.resource.data.items is list
+                   && request.resource.data.items.size() <= 150;
+    }
+
     // Todo lo demás, cerrado.
     match /{document=**} {
       allow read, write: if false;
