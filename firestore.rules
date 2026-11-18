@@ -45,7 +45,13 @@ service cloud.firestore {
       allow read: if esAdmin()
                   || (request.auth != null && 'uid' in resource.data && resource.data.uid == request.auth.uid);
       // Los pedidos no se borran (la contabilidad no se puede alterar): se cancelan cambiando su estado.
-      allow update: if esAdmin();
+      // Reclamar un pedido hecho sin sesión: el cliente que lo hizo (y conoce su identificador) lo pasa a su cuenta.
+      // Solo se permite una vez (si aún no tiene dueño), solo a su propio uid, y sin tocar ningún otro campo.
+      allow update: if esAdmin()
+                    || (request.auth != null
+                        && !('uid' in resource.data)
+                        && request.resource.data.uid == request.auth.uid
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid']));
       allow delete: if false;
     }
 

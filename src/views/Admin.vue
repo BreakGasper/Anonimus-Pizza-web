@@ -2,8 +2,8 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth'
 import { collection, query, orderBy, limit, onSnapshot, updateDoc, doc, serverTimestamp, deleteField } from 'firebase/firestore'
-import { auth, correoDeTelefono } from '../firebase/auth.js'
-import { db } from '../firebase/db.js'
+import { authAdmin as auth, dbAdmin as db } from '../firebase/admin.js'
+import { correoDeTelefono } from '../firebase/claves.js'
 import { money } from '../data/menu.js'
 import Logo from '../components/Logo.vue'
 import Icono from '../components/Icono.vue'
@@ -188,6 +188,7 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
     <header class="adm-cab">
       <div class="adm-marca"><span class="adm-logo"><Logo /></span><div><b>Panel de administración</b><small>Anonimus Pizza</small></div></div>
       <div v-if="usuario" class="adm-usuario">
+        <span class="adm-correo" title="Cuenta de administrador conectada">👤 {{ usuario.email }}</span>
         <label class="interruptor" title="Aviso sonoro de pedidos nuevos"><input type="checkbox" v-model="sonido" @change="guardarSonido" /><span>🔔 Sonido</span></label>
         <button class="btn chico claro" @click="signOut(auth)">Salir</button>
       </div>
@@ -318,7 +319,8 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 .adm-marca b { display: block; font: 800 1.4rem var(--display); text-transform: uppercase; letter-spacing: .03em; }
 .adm-marca small { color: var(--suave); }
 .adm-logo { width: 46px; flex: none; }
-.adm-usuario { display: flex; align-items: center; gap: 10px; }
+.adm-usuario { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.adm-correo { font-size: .85rem; color: var(--suave); word-break: break-all; }
 .interruptor { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; color: var(--suave); }
 .adm-login { max-width: 420px; margin: 24px auto; }
 .adm-login h1 { font-size: 2.2rem; margin-bottom: 14px; }

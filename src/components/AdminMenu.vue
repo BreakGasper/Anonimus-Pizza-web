@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { doc, onSnapshot, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore'
-import { db } from '../firebase/db.js'
+import { dbAdmin as db } from '../firebase/admin.js'
 import { MENU_INICIAL, ARMA, money, TITULOS_CATEGORIA } from '../data/menu.js'
 import { normalizar, FOTOS_BIBLIOTECA, fotoDe, hayPromo, precioFinal, fotosSubidas } from '../store/menu.js'
 import { prepararFoto, ErrorFoto } from '../utils/imagen.js'

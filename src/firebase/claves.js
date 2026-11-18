@@ -9,3 +9,8 @@ export const firebaseConfig = {
   appId: '1:559100000308:web:602058d8aaba28d4937261',
   measurementId: 'G-5366X5XD41',
 }
+
+// El acceso por teléfono del panel de administración usa un correo "de mentira" derivado del teléfono.
+// Ni el teléfono ni la contraseña están en el código: se crean en la consola de Firebase.
+export const DOMINIO_ADMIN = 'admin.anonimus.pizza'
+export const correoDeTelefono = (tel) => `${String(tel).replace(/\D/g, '')}@${DOMINIO_ADMIN}`

@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'firebase/auth'
-import { collection, query, where, onSnapshot } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore'
 import { auth } from '../firebase/auth.js'
+import { DOMINIO_ADMIN } from '../firebase/claves.js'
 import { db } from '../firebase/db.js'
 import { money } from '../data/menu.js'
 import { leerHistorial, borrarHistorial, CLAVE_SESION } from '../store/historial.js'
@@ -33,6 +34,7 @@ function mensaje(e) {
 async function enviar() {
   error.value = ''; info.value = ''
   if (!correo.value.trim() || !clave.value) return (error.value = 'Escribe tu correo y tu contraseña.')
+  if (esCorreoInterno(correo.value)) return (error.value = 'Ese correo es de uso interno de la tienda. Usa tu correo personal.')
   trabajando.value = true
   try {
     if (modo.value === 'crear') await createUserWithEmailAndPassword(auth, correo.value.trim(), clave.value)
@@ -50,6 +52,7 @@ async function olvide() {
   if (!correo.value.trim()) return (error.value = 'Escribe tu correo y vuelve a tocar “¿Olvidaste tu contraseña?”.')
   try { await sendPasswordResetEmail(auth, correo.value.trim()); info.value = 'Te enviamos un correo para cambiar tu contraseña.' } catch (e) { error.value = mensaje(e) }
 }
+const esCorreoInterno = (c) => c.trim().toLowerCase().endsWith('@' + DOMINIO_ADMIN) // esas cuentas son del panel, no de clientes
 function salir() { signOut(auth) }
 
 /* ---------- Pedidos ---------- */
@@ -62,16 +65,29 @@ onMounted(() => {
   onAuthStateChanged(auth, (u) => {
     usuario.value = u; cargando.value = false
     try { u ? localStorage.setItem(CLAVE_SESION, '1') : localStorage.removeItem(CLAVE_SESION) } catch { /* sin almacenamiento */ }
-    cortar?.(); remotos.value = []; errorDatos.value = ''
+    cortar?.(); remotos.value = []; errorDatos.value = ''; ajenos.value = new Set(); reclamados.clear()
     if (u) {
+      let primera = true
       // Solo se piden los pedidos de esta cuenta (sin ordenar en el servidor: así no hace falta ningún índice). Se ordenan aquí.
       cortar = onSnapshot(query(collection(db, 'pedidos'), where('uid', '==', u.uid)), (s) => {
         remotos.value = s.docs.map((d) => ({ id: d.id, ...d.data() }))
+        if (primera) { primera = false; reclamar(u.uid, new Set(remotos.value.map((p) => p.id))) }
       }, () => { errorDatos.value = 'No se pudieron cargar tus pedidos.' })
     }
   })
 })
 onUnmounted(() => cortar?.())
+
+// Pedidos hechos en este dispositivo antes de iniciar sesión: se pasan a la cuenta (las reglas solo lo permiten una vez y a tu propio uid).
+const reclamados = new Set()
+const ajenos = ref(new Set()) // pedidos de este dispositivo que ya son de OTRA cuenta: no se muestran a esta sesión
+async function reclamar(uid, yaEnCuenta) {
+  const pendientes = leerHistorial().map((p) => p.id).filter((id) => !yaEnCuenta.has(id) && !reclamados.has(id))
+  pendientes.forEach((id) => reclamados.add(id))
+  const res = await Promise.allSettled(pendientes.map((id) => updateDoc(doc(db, 'pedidos', id), { uid })))
+  const rechazados = pendientes.filter((id, i) => res[i].status === 'rejected' && res[i].reason?.code === 'permission-denied')
+  if (rechazados.length) ajenos.value = new Set([...ajenos.value, ...rechazados])
+}
 
 const fechaDe = (p) => (p.creado?.toDate ? p.creado.toDate() : p.fecha ? new Date(p.fecha) : new Date())
 // Pedidos de la cuenta + los hechos en este dispositivo que no estén ya en la cuenta; del más reciente al más antiguo.
@@ -79,7 +95,7 @@ const pedidos = computed(() => {
   const ids = new Set(remotos.value.map((p) => p.id))
   const todos = [
     ...remotos.value.map((p) => ({ ...p, fecha: fechaDe(p), enCuenta: true })),
-    ...locales.value.filter((p) => !ids.has(p.id)).map((p) => ({ ...p, fecha: fechaDe(p), enCuenta: false })),
+    ...locales.value.filter((p) => !ids.has(p.id) && !ajenos.value.has(p.id)).map((p) => ({ ...p, fecha: fechaDe(p), enCuenta: false })),
   ]
   return todos.sort((a, b) => b.fecha - a.fecha)
 })
@@ -168,6 +184,7 @@ const inicial = computed(() => (usuario.value?.displayName || usuario.value?.ema
 
       <div v-if="!pedidos.length" class="tarjeta vacio">
         <p>Aún no tienes pedidos.</p>
+        <p v-if="usuario" class="desc" style="margin-bottom:12px">Aquí aparecen los pedidos hechos con <b>{{ usuario.email }}</b>. Si no ves uno, entra con la misma cuenta con la que lo hiciste.</p>
         <router-link to="/arma" class="btn">Arma tu primera pizza</router-link>
       </div>
 
