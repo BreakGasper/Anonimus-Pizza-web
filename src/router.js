@@ -10,6 +10,7 @@ export default createRouter({
     { path: '/paquetes', component: () => import('./views/Paquetes.vue') },
     { path: '/adicionales', component: () => import('./views/Adicionales.vue') },
     { path: '/carrito', component: () => import('./views/Carrito.vue') },
+    { path: '/perfil', component: () => import('./views/Perfil.vue') },
     { path: '/ticket', component: () => import('./views/Ticket.vue') },
     { path: '/admin', component: () => import('./views/Admin.vue'), meta: { admin: true } },
     { path: '/:resto(.*)*', redirect: '/' },

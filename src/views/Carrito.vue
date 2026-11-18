@@ -3,6 +3,7 @@ import { reactive, ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { items, total, cambiar, quitar, vaciar, ultimoPedido } from '../store/cart.js'
 import { crearPedido } from '../firebase/pedidos.js'
+import { guardarEnHistorial } from '../store/historial.js'
 import { money } from '../data/menu.js'
 import Icono from '../components/Icono.vue'
 
@@ -62,6 +63,7 @@ async function confirmar() {
   try {
     const id = await crearPedido(datos, lineas, suma)
     ultimoPedido.value = { id, ...datos, items: lineas, total: suma, fecha: new Date().toISOString() }
+    guardarEnHistorial(ultimoPedido.value) // queda en este dispositivo para el perfil
     vaciar()
     router.push('/ticket')
   } catch (e) {
