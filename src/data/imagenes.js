@@ -27,4 +27,5 @@ export const imgLogo = `${base}img/logo.webp`
 export const urlSprites = `${base}img/sprites/sprites.json`
 export const imgAtlas = (slug) => `${base}img/sprites/${slug}.webp`
 export const imgIcono = (nombre) => `${base}img/iconos/${SLUG[nombre]}.webp`
+export const imgCalzone = `${base}img/calzone.webp`
 export const imgEspecialidad = (id) => `${base}img/esp/${id}.webp`

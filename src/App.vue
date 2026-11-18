@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { cantidad } from './store/cart.js'
 import { mensaje } from './store/toast.js'
 import Logo from './components/Logo.vue'
+import Icono from './components/Icono.vue'
 
 const route = useRoute()
 const esAdmin = computed(() => !!route.meta.admin)
@@ -15,8 +16,16 @@ const esAdmin = computed(() => !!route.meta.admin)
       <span class="marca-logo"><Logo /></span>
       <span class="marca-txt">Anonimus Pizza</span>
     </router-link>
-    <router-link to="/carrito" class="cab-carrito" aria-label="Ver carrito">
-      🛒<span v-if="cantidad" class="badge">{{ cantidad }}</span>
+    <nav class="cab-menu" aria-label="Principal">
+      <router-link to="/" exact-active-class="on">Inicio</router-link>
+      <router-link to="/especialidades" active-class="on">Menú</router-link>
+      <router-link to="/arma" active-class="on">Arma tu pizza</router-link>
+      <router-link to="/paquetes" active-class="on">Paquetes</router-link>
+      <router-link to="/adicionales" active-class="on">Adicionales</router-link>
+    </nav>
+    <router-link to="/carrito" class="pildora" aria-label="Ver carrito">
+      <Icono nombre="carrito" :tam="20" /><span class="solo-escritorio-flex">Carrito</span>
+      <span v-if="cantidad" class="badge">{{ cantidad }}</span>
     </router-link>
   </header>
 
@@ -27,8 +36,10 @@ const esAdmin = computed(() => !!route.meta.admin)
   <div v-if="mensaje" class="toast" role="status">{{ mensaje }}</div>
 
   <nav v-if="!esAdmin" class="nav" aria-label="Navegación principal">
-    <router-link to="/" exact-active-class="on">🏠<span>Inicio</span></router-link>
-    <router-link to="/especialidades" active-class="on">📖<span>Menú</span></router-link>
-    <router-link to="/carrito" active-class="on">🛒<span>Carrito<b v-if="cantidad"> ({{ cantidad }})</b></span></router-link>
+    <router-link to="/" exact-active-class="on"><Icono nombre="inicio" />Inicio</router-link>
+    <router-link to="/especialidades" active-class="on"><Icono nombre="carta" />Menú</router-link>
+    <router-link to="/arma" class="centro" active-class="on"><span class="burbuja"><Icono nombre="pizza" :tam="28" /></span><span>Arma</span></router-link>
+    <router-link to="/paquetes" active-class="on"><Icono nombre="promo" />Promos</router-link>
+    <router-link to="/carrito" active-class="on"><span class="nav-icono"><Icono nombre="carrito" /><i v-if="cantidad" class="nav-badge">{{ cantidad }}</i></span>Carrito</router-link>
   </nav>
 </template>
