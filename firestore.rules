@@ -3,20 +3,38 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Administrador: o bien el correo de Google verificado, o bien una cuenta de la lista /admins.
-    // La lista /admins se llena solo desde la consola de Firebase (ningún cliente puede escribirla),
-    // así no hay teléfonos, contraseñas ni identificadores de cuenta dentro del repositorio.
+    // ---------- Perfiles del personal ----------
+    // Cada persona del personal tiene un documento /admins/{uid} con su rol: 'admin', 'tienda' o 'empleado'
+    // (los documentos sin rol, creados a mano en la consola, cuentan como 'admin'). Si 'activo' es false, no tiene acceso.
+    // Las cuentas nuevas las registra un admin desde el panel; la primera se crea desde la consola de Firebase.
+    function personal() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data;
+    }
+    function tienePerfil() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && personal().get('activo', true) == true;
+    }
+    // Admin: el correo de Google verificado, o una cuenta con rol admin.
     function esAdmin() {
       return request.auth != null && (
         (request.auth.token.email == 'breakgasper@gmail.com' && request.auth.token.email_verified == true)
-        || exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        || (tienePerfil() && personal().get('rol', 'admin') == 'admin')
       );
     }
+    function esTienda() { return tienePerfil() && personal().get('rol', 'admin') == 'tienda'; }
+    function esEmpleado() { return tienePerfil() && personal().get('rol', 'admin') == 'empleado'; }
 
-    // Cada administrador puede leer su propio registro (la app lo usa para saber si tiene permiso).
+    // Cada persona lee su propio perfil (la app lo usa para saber su rol); un admin lee todos. Solo un admin crea o cambia perfiles.
     match /admins/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
+      allow read: if request.auth != null && (request.auth.uid == uid || esAdmin());
+      allow create, update: if esAdmin()
+                            && request.resource.data.keys().hasOnly(['nombre', 'telefono', 'rol', 'activo', 'creado', 'creadoPor'])
+                            && request.resource.data.rol in ['admin', 'tienda', 'empleado']
+                            && request.resource.data.nombre is string
+                            && request.resource.data.nombre.size() > 0 && request.resource.data.nombre.size() <= 60
+                            && request.resource.data.activo is bool;
+      allow delete: if false; // no se borran: se desactivan (activo: false)
     }
 
     // Pedidos: cualquier visitante puede CREAR uno válido (con sesión, a su nombre: campo uid).
@@ -42,12 +60,20 @@ service cloud.firestore {
                         || (request.auth != null && request.resource.data.uid == request.auth.uid))
                     && request.resource.data.estado == 'nuevo'
                     && request.resource.data.creado == request.time;
-      allow read: if esAdmin()
+      // Admin y tienda ven todos; el empleado solo los que están por atender; el cliente, los suyos.
+      allow read: if esAdmin() || esTienda()
+                  || (esEmpleado() && resource.data.estado in ['nuevo', 'preparando', 'en_camino'])
                   || (request.auth != null && 'uid' in resource.data && resource.data.uid == request.auth.uid);
       // Los pedidos no se borran (la contabilidad no se puede alterar): se cancelan cambiando su estado.
       // Reclamar un pedido hecho sin sesión: el cliente que lo hizo (y conoce su identificador) lo pasa a su cuenta.
       // Solo se permite una vez (si aún no tiene dueño), solo a su propio uid, y sin tocar ningún otro campo.
-      allow update: if esAdmin()
+      // El empleado solo puede avanzar el estado un paso (nuevo → preparando → en camino → entregado); no cancela ni edita nada más.
+      allow update: if esAdmin() || esTienda()
+                    || (esEmpleado()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado'])
+                        && ((resource.data.estado == 'nuevo' && request.resource.data.estado == 'preparando')
+                            || (resource.data.estado == 'preparando' && request.resource.data.estado == 'en_camino')
+                            || (resource.data.estado == 'en_camino' && request.resource.data.estado == 'entregado')))
                     || (request.auth != null
                         && !('uid' in resource.data)
                         && request.resource.data.uid == request.auth.uid
@@ -59,15 +85,15 @@ service cloud.firestore {
     match /config/{documento} {
       allow read: if true;
     }
-    // Menú (un solo documento con todos los productos). Solo lo cambia un admin.
+    // Menú (un solo documento con todos los productos). Lo cambian el admin y la tienda.
     match /config/menu {
-      allow write: if esAdmin()
+      allow write: if (esAdmin() || esTienda())
                    && request.resource.data.items is list
                    && request.resource.data.items.size() <= 150;
     }
-    // Fotos subidas desde el panel (texto base64 dentro de un solo documento). Tope: 20 fotos.
+    // Fotos subidas desde el panel (texto base64 dentro de un solo documento). Tope: 20 fotos. Admin y tienda.
     match /config/fotos {
-      allow write: if esAdmin()
+      allow write: if (esAdmin() || esTienda())
                    && request.resource.data.fotos is map
                    && request.resource.data.fotos.size() <= 20;
     }
