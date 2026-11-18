@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth'
 import { collection, query, orderBy, where, limit, onSnapshot, updateDoc, getDoc, getDocs, doc, serverTimestamp, deleteField } from 'firebase/firestore'
 import { authAdmin as auth, dbAdmin as db } from '../firebase/admin.js'
@@ -81,14 +82,20 @@ function escuchar() {
     : query(collection(db, 'pedidos'), orderBy('creado', 'desc'), limit(500))
   cortar = onSnapshot(q, (s) => {
     pedidos.value = s.docs.map((d) => ({ id: d.id, ...d.data() }))
-    if (!primera) s.docChanges().forEach((c) => { if (c.type === 'added') alertaNuevo(c.doc.data()) })
+    if (!primera) s.docChanges().forEach((c) => { if (c.type === 'added') alertaNuevo({ ...c.doc.data(), id: c.doc.id }) })
     primera = false
+    abrirPedidoPendiente()
   }, (e) => {
     pedidos.value = []
     errorDatos.value = e.code === 'permission-denied' ? 'sinpermiso' : 'No se pudieron cargar los pedidos.'
   })
 }
 onMounted(() => {
+  // Manifiesto solo del panel: al agregarlo a la pantalla de inicio se abre /admin (no la tienda).
+  enlaceManifiesto = document.createElement('link'); enlaceManifiesto.rel = 'manifest'; enlaceManifiesto.href = '/admin.webmanifest'; document.head.appendChild(enlaceManifiesto)
+  navigator.serviceWorker?.addEventListener('message', enMensaje)
+  document.addEventListener('visibilitychange', alVisible)
+  if (avisosActivos.value) { registrarSW(); mantenerPantalla() }
   onAuthStateChanged(auth, async (u) => {
     usuario.value = u; cortar?.(); pedidos.value = []; errorDatos.value = ''; rol.value = null
     if (!u) { cargando.value = false; return }
@@ -100,7 +107,7 @@ onMounted(() => {
     escuchar()
   })
 })
-onUnmounted(() => { cortar?.(); document.title = tituloOriginal })
+onUnmounted(() => { cortar?.(); document.title = tituloOriginal; quitarAvisos() })
 
 /* ---------- Aviso de pedidos nuevos ---------- */
 const tituloOriginal = typeof document !== 'undefined' ? document.title : ''
@@ -124,6 +131,75 @@ function alertaNuevo(p) {
   if (sonido.value) pitar()
   aviso.value = `Nuevo pedido de ${p.nombre} · ${money(p.total || 0)}`
   clearTimeout(tAviso); tAviso = setTimeout(() => (aviso.value = ''), 6000)
+  notificar(p)
+}
+
+/* ---------- Notificaciones del sistema (con el panel instalado en el teléfono) ----------
+   No hay servidor de envío (plan gratuito): el aviso sale desde este mismo panel cuando llega un pedido, así que
+   funciona mientras la app esté abierta o en segundo plano, no con el teléfono bloqueado o la app cerrada del todo. */
+const avisosSoportados = typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator
+const permisoAvisos = ref(avisosSoportados ? Notification.permission : 'unsupported') // default | granted | denied | unsupported
+const avisosOn = ref((() => { try { return localStorage.getItem('anonimus-admin-avisos') === '1' } catch { return false } })())
+const avisosActivos = computed(() => avisosOn.value && permisoAvisos.value === 'granted')
+const instalada = typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true)
+const esIOS = typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent)
+const textoAvisos = computed(() => {
+  if (permisoAvisos.value === 'unsupported') return esIOS && !instalada ? 'En iPhone, primero agrega esta página a la pantalla de inicio (Compartir → Agregar a inicio) y ábrela desde ahí.' : 'Este navegador no permite notificaciones.'
+  if (permisoAvisos.value === 'denied') return 'Las notificaciones están bloqueadas. Actívalas en los ajustes del navegador o de la app.'
+  return 'No se activaron las notificaciones. Vuelve a tocar el botón y elige Permitir.'
+})
+let registroSW = null, pantalla = null, enlaceManifiesto = null
+const ayudaAvisos = ref(false)
+async function registrarSW() {
+  if (!avisosSoportados) return null
+  try { await navigator.serviceWorker.register('/sw.js'); registroSW ||= await navigator.serviceWorker.ready; return registroSW } catch { return null }
+}
+async function mantenerPantalla() {
+  try { if (avisosActivos.value && document.visibilityState === 'visible' && 'wakeLock' in navigator && !pantalla) { pantalla = await navigator.wakeLock.request('screen'); pantalla.addEventListener('release', () => (pantalla = null)) } } catch { /* sin wake lock */ }
+}
+async function soltarPantalla() { try { await pantalla?.release() } catch { /* nada */ } pantalla = null }
+async function alternarAvisos() {
+  if (avisosActivos.value) { avisosOn.value = false; try { localStorage.setItem('anonimus-admin-avisos', '0') } catch { /* nada */ } soltarPantalla(); return }
+  if (!avisosSoportados || permisoAvisos.value === 'denied') { ayudaAvisos.value = true; return }
+  ayudaAvisos.value = false
+  if (Notification.permission !== 'granted') permisoAvisos.value = await Notification.requestPermission() // debe salir de un toque
+  else permisoAvisos.value = 'granted'
+  if (permisoAvisos.value !== 'granted') { ayudaAvisos.value = true; return }
+  avisosOn.value = true; try { localStorage.setItem('anonimus-admin-avisos', '1') } catch { /* nada */ }
+  mantenerPantalla()
+  const r = await registrarSW(); try { await r?.showNotification('Avisos activados', { body: 'Te avisaremos de cada pedido nuevo.', icon: '/icono-192.png', tag: 'prueba' }) } catch { /* nada */ }
+}
+async function notificar(p) {
+  if (!avisosActivos.value || (document.visibilityState === 'visible' && document.hasFocus())) return // con el panel a la vista basta el aviso en pantalla
+  const r = await registrarSW(); if (!r) return
+  try {
+    await r.showNotification('Nuevo pedido · ' + money(p.total || 0), {
+      body: `${p.nombre || 'Cliente'} · folio ${String(p.id || '').slice(0, 6).toUpperCase()}`, icon: '/icono-192.png', badge: '/icono-192.png',
+      tag: 'pedido-' + p.id, data: { id: p.id }, renotify: true, requireInteraction: true, vibrate: [200, 100, 200],
+    })
+  } catch { /* sin permiso o sin soporte */ }
+}
+function enMensaje(ev) { if (ev.data?.tipo === 'abrir-pedido') { idPendiente = ev.data.id; abrirPedidoPendiente() } }
+function alVisible() { if (document.visibilityState === 'visible') mantenerPantalla() }
+function quitarAvisos() { enlaceManifiesto?.remove(); navigator.serviceWorker?.removeEventListener('message', enMensaje); document.removeEventListener('visibilitychange', alVisible); soltarPantalla() }
+
+/* ---------- Abrir un pedido concreto (al tocar la notificación: /admin?pedido=ID) ---------- */
+const route = useRoute()
+const router = useRouter()
+let idPendiente = route.query.pedido ? String(route.query.pedido) : ''
+const resaltado = ref('')
+async function abrirPedidoPendiente() {
+  if (!idPendiente || !pedidos.value.length) return
+  const p = pedidos.value.find((x) => x.id === idPendiente)
+  const id = idPendiente; idPendiente = ''
+  if (route.query.pedido) router.replace({ path: '/admin' })
+  if (!p) return
+  pestana.value = 'pedidos'; busqueda.value = ''
+  if (!esEmpleadoRol.value) { estado.value = esPend(p) ? 'activos' : 'todos'; periodo.value = 'todo' }
+  resaltado.value = id
+  await nextTick()
+  document.getElementById('ped-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  setTimeout(() => { if (resaltado.value === id) resaltado.value = '' }, 4000)
 }
 
 /* ---------- Filtros ---------- */
@@ -228,11 +304,13 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
         <span class="adm-correo" title="Cuenta conectada"><Icono nombre="usuario" :tam="16" class="txt" />{{ usuario.email }}</span>
         <span v-if="rol" :class="['rol-insignia', rol]">{{ ROL_ETIQUETA[rol] }}</span>
         <label class="interruptor" title="Aviso sonoro de pedidos nuevos"><input type="checkbox" v-model="sonido" @change="guardarSonido" /><span><Icono nombre="campana" :tam="16" class="txt" />Sonido</span></label>
+        <button :class="['btn', 'chico', avisosActivos ? '' : 'claro']" :aria-pressed="avisosActivos" title="Notificaciones de pedidos nuevos en este teléfono" @click="alternarAvisos"><Icono nombre="campana" :tam="16" class="txt" />{{ avisosActivos ? 'Avisos activos' : 'Activar avisos' }}</button>
         <button class="btn chico claro" @click="signOut(auth)">Salir</button>
       </div>
       <router-link v-else to="/" class="btn chico claro"><Icono nombre="izquierda" :tam="16" class="txt" />Ir a la tienda</router-link>
     </header>
 
+    <p v-if="ayudaAvisos && textoAvisos" class="sub aviso-ayuda">{{ textoAvisos }}</p>
     <p v-if="cargando" class="sub">Cargando…</p>
 
     <!-- Acceso -->
@@ -291,7 +369,7 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 
           <p v-if="!visibles.length && !errorDatos" class="sub">{{ esEmpleadoRol ? 'No hay pedidos por atender. ¡Todo al día!' : 'No hay pedidos con estos filtros.' }}</p>
           <div class="adm-lista">
-            <article v-for="p in visibles" :key="p.id" :class="['tarjeta', 'pedido', p.estado]">
+            <article v-for="p in visibles" :key="p.id" :id="'ped-' + p.id" :class="['tarjeta', 'pedido', p.estado, { resaltado: resaltado === p.id }]">
               <div class="fila" style="align-items:flex-start">
                 <div class="grow">
                   <b>{{ p.nombre }}</b>
@@ -391,6 +469,8 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 .adm-estados .chip b { margin-left: 4px; opacity: .85; }
 .adm-lista { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .pedido { margin: 0; border-left: 5px solid var(--borde); }
+.pedido.resaltado { outline: 3px solid var(--ambar); outline-offset: 2px; animation: late 1s ease-in-out 3; }
+@keyframes late { 50% { box-shadow: 0 0 0 8px #ffc24733; } }
 .pedido.nuevo { border-left-color: var(--rojo); } .pedido.preparando { border-left-color: #e0a100; } .pedido.en_camino { border-left-color: #3b82f6; } .pedido.entregado { border-left-color: var(--verde); } .pedido.cancelado { opacity: .65; }
 .contacto { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 6px; }
 .enlace { color: #ffd48a; font-weight: 600; word-break: break-word; }
