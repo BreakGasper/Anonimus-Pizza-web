@@ -1,12 +1,12 @@
 <script setup>
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { ARMA, TAMANOS, precioPorTamano, money } from '../data/menu.js'
+import { ARMA, ESPECIALIDADES, TAMANOS, precioPorTamano, money } from '../data/menu.js'
 import { agregar } from '../store/cart.js'
 import { avisar } from '../store/toast.js'
 import Tamanos from '../components/Tamanos.vue'
 import PizzaPreview from '../components/PizzaPreview.vue'
-import { imgIcono } from '../data/imagenes.js'
+import { imgIcono, imgEspecialidad } from '../data/imagenes.js'
 
 const router = useRouter()
 const tamano = ref('med')
@@ -16,6 +16,13 @@ const nombre = ref('')
 // Cada pizza nueva se arma distinta; "Mezclar" la reparte otra vez.
 const nuevaSemilla = () => Math.floor(Math.random() * 2 ** 31)
 const semilla = ref(nuevaSemilla())
+
+// Mezcla automática: cada vez que cambias un ingrediente, la pizza se reparte de nuevo (y las piezas vuelven a caer).
+const CLAVE_AUTO = 'anonimus-mezcla-auto'
+const leerAuto = () => { try { return localStorage.getItem(CLAVE_AUTO) !== '0' } catch { return true } }
+const autoMezcla = ref(leerAuto())
+function guardarAuto() { try { localStorage.setItem(CLAVE_AUTO, autoMezcla.value ? '1' : '0') } catch { /* sin almacenamiento */ } }
+const cambio = () => { if (autoMezcla.value) semilla.value = nuevaSemilla() }
 
 const tam = computed(() => TAMANOS.find((x) => x.id === tamano.value))
 const sobrantes = computed(() => Math.max(0, elegidos.value.length - ARMA.incluidos))
@@ -93,7 +100,7 @@ function soltar(e) {
     setTimeout(() => (ignorarClic = false), 0)
     if (dentro(e)) {
       if (elegidos.value.includes(gesto.nombre)) avisar(`${gesto.nombre} ya está en tu pizza`)
-      else elegidos.value.push(gesto.nombre)
+      else { elegidos.value.push(gesto.nombre); cambio() }
     }
   }
   limpiar()
@@ -104,7 +111,40 @@ function evitarScroll(e) { if (gesto?.activo && e.cancelable) e.preventDefault()
 function clic(ing) {
   if (ignorarClic) return
   alternar(elegidos.value, ing)
+  cambio()
 }
+
+function quitar(ing) {
+  alternar(elegidos.value, ing)
+  cambio()
+}
+
+/* ---------- Atajos: especialidad de arranque y "Sorpréndeme" ---------- */
+const reducido = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+function irAPizza() {
+  setTimeout(() => zona.value?.scrollIntoView({ behavior: reducido ? 'auto' : 'smooth', block: 'center' }), 60)
+}
+function aplicar(lista) {
+  elegidos.value = [...lista]
+  semilla.value = nuevaSemilla()
+  irAPizza()
+}
+function sorprender() {
+  const todos = [...ARMA.verduras, ...ARMA.carnes]
+  for (let i = todos.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [todos[i], todos[j]] = [todos[j], todos[i]] }
+  aplicar(todos.slice(0, 3 + Math.floor(Math.random() * 3)))
+}
+const esReceta = (e) => e.ingredientes.length === elegidos.value.length && e.ingredientes.every((i) => elegidos.value.includes(i))
+
+/* ---------- Barra de pedido: ¿se ve la pizza? ---------- */
+const pizzaVisible = ref(true)
+let vigia
+onMounted(() => {
+  if (typeof IntersectionObserver !== 'function') return
+  vigia = new IntersectionObserver(([e]) => (pizzaVisible.value = e.isIntersecting), { threshold: 0.35 })
+  vigia.observe(zona.value)
+})
+onBeforeUnmount(() => vigia?.disconnect())
 onBeforeUnmount(limpiar)
 
 function pedir() {
@@ -127,11 +167,20 @@ function pedir() {
   <h1 class="titulo">Arma tu pizza</h1>
   <p class="sub">{{ money(ARMA.precioMediana) }} la mediana con {{ ARMA.incluidos }} ingredientes. Cada ingrediente extra suma {{ money(ARMA.precioExtraIngrediente) }}.</p>
 
-  <h3>Tamaño</h3>
+  <h3>Empieza rápido</h3>
+  <p class="desc" style="margin-bottom:6px">Toca una especialidad y ajústala a tu gusto, o deja que te sorprendamos.</p>
+  <div class="rapido">
+    <button v-for="e in ESPECIALIDADES" :key="e.id" type="button" :class="['chip esp', { on: esReceta(e) }]" :aria-pressed="esReceta(e)" @click="aplicar(e.ingredientes)">
+      <img :src="imgEspecialidad(e.id)" alt="" width="30" height="30" />{{ e.nombre }}
+    </button>
+    <button type="button" class="chip sorpresa" @click="sorprender">🎲 Sorpréndeme</button>
+  </div>
+
+  <h3 style="margin-top:18px">Tamaño</h3>
   <Tamanos v-model="tamano" />
 
   <h3 style="margin-top:18px">Ingredientes</h3>
-  <p class="desc" style="margin-bottom:6px">Tócalos o <b>arrástralos</b> a la pizza <span class="solo-tactil">(mantén presionado y arrastra)</span>.</p>
+  <p class="desc" style="margin-bottom:6px">Tócalos o <b>arrástralos</b> a la pizza<span class="solo-tactil"> (mantén presionado y arrastra)</span>.</p>
 
   <div class="paleta" aria-label="Verduras">
     <button v-for="v in ARMA.verduras" :key="v" type="button" :class="['chip ing', { on: elegidos.includes(v) }]"
@@ -156,12 +205,13 @@ function pedir() {
   <div ref="zona" :class="['zona-pizza', { activa: sobrePizza, vacia: !elegidos.length }]">
     <PizzaPreview :ingredientes="elegidos" :extras="extras" :tamano="tamano" :activa="sobrePizza" :semilla="semilla" />
     <p class="pie-pizza">{{ tam.nombre }} · {{ tam.cm }}</p>
-    <div v-if="elegidos.length" style="text-align:center;margin-bottom:6px">
+    <div v-if="elegidos.length" class="mezcla">
       <button type="button" class="btn chico claro" @click="semilla = nuevaSemilla()">🔀 Mezclar</button>
+      <label class="auto"><input type="checkbox" v-model="autoMezcla" @change="guardarAuto" /> Mezclar sola al cambiar</label>
     </div>
     <p v-if="!elegidos.length" class="desc" style="text-align:center">Suelta aquí los ingredientes que quieras.</p>
     <div v-else class="lleva">
-      <button v-for="ing in elegidos" :key="ing" type="button" class="quitar-ing" :aria-label="'Quitar ' + ing" @click="alternar(elegidos, ing)">{{ ing }} ✕</button>
+      <button v-for="ing in elegidos" :key="ing" type="button" class="quitar-ing" :aria-label="'Quitar ' + ing" @click="quitar(ing)">{{ ing }} ✕</button>
     </div>
   </div>
 
@@ -179,7 +229,15 @@ function pedir() {
       <div class="precio" style="font-size:1.3rem">{{ money(precio) }}</div>
     </div>
   </div>
-  <button class="btn block" :disabled="!elegidos.length" @click="pedir">Agregar al carrito</button>
+  <div v-if="elegidos.length" class="relleno-barra"></div>
+
+  <div v-if="elegidos.length" class="barra-pedir" role="region" aria-label="Tu pizza">
+    <div class="barra-in">
+      <button v-if="!pizzaVisible" type="button" class="btn claro chico" @click="irAPizza">Ver pizza ↓</button>
+      <div class="grow"><b>{{ money(precio) }}</b></div>
+      <button class="btn" @click="pedir">Agregar al carrito</button>
+    </div>
+  </div>
 
   <div v-if="arrastre" class="fantasma" :style="{ left: arrastre.x + 'px', top: arrastre.y + 'px' }" aria-hidden="true">
     <img :src="imgIcono(arrastre.nombre)" alt="" width="38" height="38" />
@@ -200,6 +258,18 @@ function pedir() {
 .quitar-ing { border: 1px solid var(--linea); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: .8rem; }
 .fantasma { position: fixed; z-index: 50; transform: translate(-50%, -135%); pointer-events: none; display: flex; align-items: center; gap: 6px;
   background: #fff; border: 2px solid #ff9800; border-radius: 999px; padding: 4px 12px 4px 6px; box-shadow: 0 6px 18px #0004; font-weight: 600; font-size: .9rem; }
+.rapido { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.chip.esp { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 4px; }
+.chip.esp img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+.chip.sorpresa { background: linear-gradient(135deg, #ff9800, #ff5722); border-color: #ff7a1a; color: #fff; font-weight: 600; }
+.mezcla { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-bottom: 6px; }
+.mezcla .auto { color: #f3dfc7; font-size: .8rem; display: inline-flex; gap: 6px; align-items: center; }
+.relleno-barra { height: 64px; }
+.barra-pedir { position: fixed; left: 0; right: 0; bottom: calc(58px + env(safe-area-inset-bottom, 0px)); z-index: 9; background: rgba(255, 247, 234, .96);
+  backdrop-filter: blur(6px); border-top: 1px solid var(--linea); padding: 8px 16px; box-shadow: 0 -4px 14px #0002; }
+.barra-in { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; align-items: center; }
+.barra-in .btn { white-space: nowrap; }
+.barra-in .grow b { font: 700 1.3rem var(--display); color: var(--verde); }
 .solo-tactil { display: none; }
 @media (pointer: coarse) { .solo-tactil { display: inline; } }
 </style>
