@@ -101,6 +101,26 @@ await t('un admin puede dejar el mapa vacío (borrar fotos)', assertSucceeds(set
 await t('no se puede esquivar el tope poniendo "items" en config/fotos', assertFails(setDoc(doc(listaAdmin, 'config/fotos'), { ...foto(21), items: [] })))
 await t('ni el admin escribe otros documentos de config', assertFails(setDoc(doc(listaAdmin, 'config/otro'), { items: [] })))
 
+// ---- Reclamar un pedido hecho sin sesión (invitado -> cuenta) ----
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const f = ctx.firestore()
+  await setDoc(doc(f, 'pedidos/inv1'), { ...valido(), creado: new Date() })
+  await setDoc(doc(f, 'pedidos/inv2'), { ...valido(), creado: new Date() })
+  await setDoc(doc(f, 'pedidos/inv3'), { ...valido(), creado: new Date() })
+  await setDoc(doc(f, 'pedidos/inv4'), { ...valido(), creado: new Date() })
+  await setDoc(doc(f, 'pedidos/deBeto'), { ...valido(), creado: new Date(), uid: 'beto' })
+})
+await t('el cliente reclama un pedido de invitado (solo pone su uid)', assertSucceeds(updateDoc(doc(ana, 'pedidos/inv1'), { uid: 'ana' })))
+await t('...y después lo puede leer', assertSucceeds(getDoc(doc(ana, 'pedidos/inv1'))))
+await t('NO puede reclamar un pedido que ya tiene dueño', assertFails(updateDoc(doc(ana, 'pedidos/deBeto'), { uid: 'ana' })))
+await t('NO puede reclamarlo a nombre de otra persona', assertFails(updateDoc(doc(ana, 'pedidos/inv2'), { uid: 'beto' })))
+await t('NO puede cambiar otros campos al reclamar (estado)', assertFails(updateDoc(doc(ana, 'pedidos/inv2'), { uid: 'ana', estado: 'entregado' })))
+await t('NO puede cambiar otros campos al reclamar (total)', assertFails(updateDoc(doc(ana, 'pedidos/inv2'), { uid: 'ana', total: 1 })))
+await t('el visitante sin sesión NO puede reclamar', assertFails(updateDoc(doc(anon, 'pedidos/inv3'), { uid: 'ana' })))
+await t('un pedido ya reclamado no se puede volver a reclamar por otro', assertFails(updateDoc(doc(beto, 'pedidos/inv1'), { uid: 'beto' })))
+await t('el dueño no puede quitarse ni cambiar el uid', assertFails(updateDoc(doc(ana, 'pedidos/inv1'), { uid: 'beto' })))
+await t('el admin sigue pudiendo actualizar el estado de un pedido reclamado', assertSucceeds(updateDoc(doc(listaAdmin, 'pedidos/inv1'), { estado: 'preparando' })))
+
 await env.cleanup()
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodas las pruebas pasaron')
 process.exit(fallos ? 1 : 0)

@@ -30,7 +30,7 @@ En `/admin` → pestaña **Menú** se agregan, editan, ocultan, duplican, ordena
 Los clientes pueden crear una cuenta (correo y contraseña, o Google) para ver sus **pedidos y tickets** del más reciente al más antiguo, agrupados por día, y seguir el estado de cada pedido en vivo (Recibido → Preparando → En camino → Entregado).
 
 - Con sesión iniciada, cada pedido nuevo se guarda con el `uid` de la cuenta. Las reglas dejan leer un pedido solo al administrador o a su dueño; nadie puede editarlo ni borrarlo (solo el admin). La consulta del perfil filtra por `uid` sin ordenar en el servidor (se ordena en el navegador), así que **no hace falta ningún índice**.
-- Quien compra sin cuenta ve en su perfil los pedidos hechos **en ese dispositivo** (guardados solo en su navegador), con el estado "Enviado". Los pedidos hechos antes de iniciar sesión no se pasan a la cuenta.
+- Quien compra sin cuenta ve en su perfil los pedidos hechos **en ese dispositivo** (guardados solo en su navegador), con el estado "Enviado". Al **iniciar sesión, esos pedidos se pasan a la cuenta** (las reglas permiten reclamar un pedido sin dueño una sola vez, solo a tu propio uid y sin tocar otros campos); desde entonces se ven en cualquier dispositivo y con su estado en vivo. Si otra persona entra en el mismo dispositivo, no ve los pedidos de otra cuenta.
 - Para activar los accesos: **Authentication → Método de acceso** → Correo/contraseña y Google; y en **Dominios autorizados** el dominio de la tienda.
 
 ### Fotos subidas y topes
@@ -42,3 +42,7 @@ Los clientes pueden crear una cuenta (correo y contraseña, o Google) para ver s
 ## Pedidos: cancelar, no borrar
 
 Los pedidos **no se pueden borrar** (ni desde el panel ni por las reglas): se **cancelan** (con confirmación y fecha de cancelación). Un pedido cancelado **no cuenta en las ventas**. La pestaña **Resumen** muestra, por periodo (hoy, 7 días, 30 días o todos): pedidos recibidos, vendidos (sin cancelados), entregados, en proceso, cancelados, ventas, monto cancelado, ticket promedio y porcentaje de cancelados, además de una gráfica de 7 días con los cancelados de cada día y lo más vendido.
+
+## Sesiones separadas: panel de administración y clientes
+
+El panel (`/admin`) usa **su propia instancia de Firebase** (`src/firebase/admin.js`, app "admin"), con su sesión guardada aparte, independiente de la de los clientes (`src/firebase/auth.js`). Entrar o salir en uno no afecta al otro. Las cuentas internas del panel (`@admin.anonimus.pizza`) no pueden entrar ni registrarse como clientes, y el panel muestra la cuenta conectada en la cabecera.
