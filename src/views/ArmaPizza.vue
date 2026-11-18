@@ -6,7 +6,7 @@ import { agregar } from '../store/cart.js'
 import { avisar } from '../store/toast.js'
 import Tamanos from '../components/Tamanos.vue'
 import PizzaPreview from '../components/PizzaPreview.vue'
-import FormaIngrediente from '../components/FormaIngrediente.vue'
+import { imgIcono } from '../data/imagenes.js'
 
 const router = useRouter()
 const tamano = ref('med')
@@ -133,13 +133,13 @@ function pedir() {
   <div class="paleta" aria-label="Verduras">
     <button v-for="v in ARMA.verduras" :key="v" type="button" :class="['chip ing', { on: elegidos.includes(v) }]"
       :aria-pressed="elegidos.includes(v)" @pointerdown="empezar($event, v)" @click="clic(v)" @contextmenu.prevent>
-      <svg viewBox="-10 -10 20 20" width="20" height="20" aria-hidden="true"><FormaIngrediente :nombre="v" /></svg>{{ v }}
+      <img :src="imgIcono(v)" alt="" class="ico" width="26" height="26" draggable="false" />{{ v }}
     </button>
   </div>
   <div class="paleta" aria-label="Carnes">
     <button v-for="c in ARMA.carnes" :key="c" type="button" :class="['chip ing', { on: elegidos.includes(c) }]"
       :aria-pressed="elegidos.includes(c)" @pointerdown="empezar($event, c)" @click="clic(c)" @contextmenu.prevent>
-      <svg viewBox="-10 -10 20 20" width="20" height="20" aria-hidden="true"><FormaIngrediente :nombre="c" /></svg>{{ c }}
+      <img :src="imgIcono(c)" alt="" class="ico" width="26" height="26" draggable="false" />{{ c }}
     </button>
   </div>
 
@@ -176,7 +176,7 @@ function pedir() {
   <button class="btn block" :disabled="!elegidos.length" @click="pedir">Agregar al carrito</button>
 
   <div v-if="arrastre" class="fantasma" :style="{ left: arrastre.x + 'px', top: arrastre.y + 'px' }" aria-hidden="true">
-    <svg viewBox="-10 -10 20 20" width="34" height="34"><FormaIngrediente :nombre="arrastre.nombre" /></svg>
+    <img :src="imgIcono(arrastre.nombre)" alt="" width="38" height="38" />
     <span>{{ arrastre.nombre }}</span>
   </div>
 </template>
@@ -184,7 +184,7 @@ function pedir() {
 <style>
 .paleta { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
 .chip.ing { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
-.chip.ing svg { background: #fff7ea; border-radius: 50%; }
+.chip.ing .ico { width: 26px; height: 26px; object-fit: contain; flex: none; pointer-events: none; }
 .zona-pizza { background: radial-gradient(circle at 50% 40%, #f6ead8, #ead8bd); border: 2px dashed var(--linea); border-radius: 18px; padding: 16px 12px 12px; margin-bottom: 14px; transition: border-color .15s, background .15s; }
 .zona-pizza.activa { border-color: #ff9800; background: #fff1d6; }
 .pie-pizza { text-align: center; color: var(--suave); font-size: .85rem; margin: 6px 0 4px; }

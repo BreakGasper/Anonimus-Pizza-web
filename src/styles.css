@@ -25,7 +25,7 @@ button { font: inherit; cursor: pointer; }
   padding: 10px 16px; background: linear-gradient(var(--horno2), var(--horno)); color: #fff; }
 .marca { display: flex; align-items: center; gap: 8px; }
 .marca-logo { width: 38px; flex: none; }
-.hero-logo { width: min(300px, 80%); margin: 0 auto 12px; }
+.hero-logo { width: min(280px, 78%); margin: 0 auto 12px; }
 .marca-txt { font: 700 1.5rem var(--display); letter-spacing: .03em; text-transform: uppercase; }
 .cab-carrito { position: relative; font-size: 1.5rem; padding: 4px 8px; }
 .badge { position: absolute; top: -2px; right: -4px; background: var(--rojo); color: #fff; font: 600 .7rem var(--cuerpo);
@@ -102,3 +102,5 @@ label.campo { display: block; margin-bottom: 12px; font-weight: 600; font-size: 
 .acciones { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 
 @media (min-width: 640px) { .rejilla { grid-template-columns: repeat(4, 1fr); } h1 { font-size: 2.8rem; } }
+
+.foto-esp { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; flex: none; box-shadow: 0 2px 6px #0004; }
