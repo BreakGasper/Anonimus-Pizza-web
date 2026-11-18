@@ -52,3 +52,18 @@ export const ADICIONALES = {
 }
 
 export const money = (n) => '$' + Number(n).toLocaleString('es-MX')
+
+/* ---------- Menú inicial (lista unificada) ----------
+   Es lo que se muestra mientras no exista el menú guardado en Firestore (config/menu) y lo que el panel
+   de administración carga la primera vez. Cada elemento:
+   { id, tipo: 'especialidad' | 'paquete' | 'adicional', categoria ('calzones' | 'bebidas' | 'otros', solo adicionales),
+     nombre, desc, precio, precioPromo, enPromo, favorita, activo, emoji, foto ('lib:clave' | 'https://…' | ''), ingredientes[] } */
+const base = { precioPromo: null, enPromo: false, favorita: false, activo: true, ingredientes: [], categoria: '', foto: '' }
+export const MENU_INICIAL = [
+  ...ESPECIALIDADES.map((e) => ({ ...base, id: e.id, tipo: 'especialidad', nombre: e.nombre, desc: e.desc, precio: e.precio, emoji: e.emoji, foto: 'lib:' + e.id, ingredientes: [...e.ingredientes], favorita: true })),
+  ...PAQUETES.map((p) => ({ ...base, id: p.id, tipo: 'paquete', nombre: p.nombre, desc: p.desc, precio: p.precio, emoji: p.emoji, foto: 'lib:' + p.fotoEsp })),
+  ...ADICIONALES.calzones.map((a) => ({ ...base, id: a.id, tipo: 'adicional', categoria: 'calzones', nombre: a.nombre, desc: a.desc, precio: a.precio, emoji: a.emoji, foto: 'lib:calzone' })),
+  ...ADICIONALES.bebidas.map((a) => ({ ...base, id: a.id, tipo: 'adicional', categoria: 'bebidas', nombre: a.nombre, desc: a.desc, precio: a.precio, emoji: a.emoji })),
+]
+
+export const TITULOS_CATEGORIA = { calzones: 'Calzones', bebidas: 'Bebidas', otros: 'Otros' }

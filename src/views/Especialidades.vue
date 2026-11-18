@@ -1,19 +1,19 @@
 <script setup>
 import { ref } from 'vue'
-import { ESPECIALIDADES, TAMANOS, precioPorTamano } from '../data/menu.js'
+import { TAMANOS, precioPorTamano } from '../data/menu.js'
+import { especialidades, precioFinal, hayPromo, fotoDe } from '../store/menu.js'
 import { agregar } from '../store/cart.js'
 import { avisar } from '../store/toast.js'
 import Tamanos from '../components/Tamanos.vue'
 import MenuTabs from '../components/MenuTabs.vue'
 import ProductoCard from '../components/ProductoCard.vue'
-import { imgEspecialidad } from '../data/imagenes.js'
 
 const tamano = ref('med')
 const t = () => TAMANOS.find((x) => x.id === tamano.value)
 
 function pedir(e) {
   const tam = t()
-  const ok = agregar({ clave: `esp-${e.id}-${tam.id}`, nombre: `Pizza ${e.nombre}`, detalle: `${tam.nombre} (${tam.cm})`, precio: precioPorTamano(e.precio, tam), foto: imgEspecialidad(e.id) })
+  const ok = agregar({ clave: `esp-${e.id}-${tam.id}`, nombre: `Pizza ${e.nombre}`, detalle: `${tam.nombre} (${tam.cm})`, precio: precioPorTamano(precioFinal(e), tam), foto: fotoDe(e) || undefined, emoji: e.emoji })
   avisar(ok ? `${e.nombre} agregada` : 'El carrito está lleno')
 }
 </script>
@@ -24,7 +24,9 @@ function pedir(e) {
   <p class="sub">Elige el tamaño y agrega tu favorita. El precio cambia según el tamaño.</p>
   <Tamanos v-model="tamano" />
   <div style="height:16px"></div>
+  <p v-if="!especialidades.length" class="sub">Por ahora no hay especialidades disponibles.</p>
   <div class="grilla">
-    <ProductoCard v-for="e in ESPECIALIDADES" :key="e.id" :nombre="e.nombre" :desc="e.desc" :precio="precioPorTamano(e.precio, t())" :foto="imgEspecialidad(e.id)" @agregar="pedir(e)" />
+    <ProductoCard v-for="e in especialidades" :key="e.id" :nombre="e.nombre" :desc="e.desc" :precio="precioPorTamano(precioFinal(e), t())"
+      :precio-original="hayPromo(e) ? precioPorTamano(e.precio, t()) : undefined" :etiqueta="hayPromo(e) ? 'Promo' : undefined" :foto="fotoDe(e)" :emoji="e.emoji" @agregar="pedir(e)" />
   </div>
 </template>

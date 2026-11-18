@@ -1,12 +1,13 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { ARMA, ESPECIALIDADES, TAMANOS, precioPorTamano, money } from '../data/menu.js'
+import { ARMA, TAMANOS, precioPorTamano, money } from '../data/menu.js'
+import { recetas, fotoDe } from '../store/menu.js'
 import { agregar } from '../store/cart.js'
 import { avisar } from '../store/toast.js'
 import Tamanos from '../components/Tamanos.vue'
 import PizzaPreview from '../components/PizzaPreview.vue'
-import { imgIcono, imgEspecialidad } from '../data/imagenes.js'
+import { imgIcono } from '../data/imagenes.js'
 
 const router = useRouter()
 const tamano = ref('med')
@@ -170,8 +171,8 @@ function pedir() {
         <h3>Empieza rápido</h3>
         <p class="desc" style="margin-bottom:8px">Toca una especialidad y ajústala a tu gusto, o deja que te sorprendamos.</p>
         <div class="rapido">
-          <button v-for="e in ESPECIALIDADES" :key="e.id" type="button" :class="['chip esp', { on: esReceta(e) }]" :aria-pressed="esReceta(e)" @click="aplicar(e.ingredientes)">
-            <img :src="imgEspecialidad(e.id)" alt="" width="30" height="30" />{{ e.nombre }}
+          <button v-for="e in recetas" :key="e.id" type="button" :class="['chip esp', { on: esReceta(e) }]" :aria-pressed="esReceta(e)" @click="aplicar(e.ingredientes)">
+            <img v-if="fotoDe(e)" :src="fotoDe(e)" alt="" width="30" height="30" /><span v-else class="mini-emoji" aria-hidden="true">{{ e.emoji || '🍕' }}</span>{{ e.nombre }}
           </button>
           <button type="button" class="chip sorpresa" @click="sorprender">🎲 Sorpréndeme</button>
         </div>
@@ -261,6 +262,7 @@ function pedir() {
 .chip.ing { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px 5px 8px; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .chip.ing .ico { width: 26px; height: 26px; object-fit: contain; flex: none; pointer-events: none; }
 .chip.esp { display: inline-flex; align-items: center; gap: 6px; padding: 4px 14px 4px 5px; }
+.chip.esp .mini-emoji { width: 30px; height: 30px; display: grid; place-items: center; font-size: 1.2rem; }
 .chip.esp img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
 .chip.sorpresa { background: linear-gradient(135deg, #ff9800, #ff5722); border-color: #ff7a1a; color: #fff; font-weight: 700; }
 .zona-pizza { background: linear-gradient(rgba(25,10,3,.2), rgba(25,10,3,.55)), url('/img/mesa.webp') center / cover; border: 2px solid #4a2110;
