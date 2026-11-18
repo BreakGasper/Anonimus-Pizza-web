@@ -54,6 +54,10 @@ async function confirmar() {
    <section>
     <article v-for="i in items" :key="i.clave" class="tarjeta">
       <div class="fila">
+        <div class="item-foto" aria-hidden="true">
+          <img v-if="i.foto" :src="i.foto" alt="" width="72" height="72" decoding="async" />
+          <span v-else>{{ i.emoji || '🍕' }}</span>
+        </div>
         <div class="grow">
           <b>{{ i.nombre }}</b>
           <p v-if="i.detalle" class="desc">{{ i.detalle }}</p>

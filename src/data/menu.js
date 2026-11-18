@@ -33,9 +33,9 @@ export const ARMA = {
 }
 
 export const PAQUETES = [
-  { id: 'solo', nombre: 'Solo para ti', emoji: '🙋', precio: 99, desc: '1 pizza individual Clásica + 1 refresco de lata.' },
-  { id: 'duo', nombre: 'Dúo clásico', emoji: '👫', precio: 320, desc: '2 pizzas medianas Clásica + 1 refresco de 2 L.' },
-  { id: 'fiesta', nombre: 'Fiesta', emoji: '🎉', precio: 399, desc: '1 pizza familiar Pepechon + 3 calzones + 2 refrescos de 2 L.' },
+  { id: 'solo', nombre: 'Solo para ti', emoji: '🙋', precio: 99, fotoEsp: 'clasica', desc: '1 pizza individual Clásica + 1 refresco de lata.' },
+  { id: 'duo', nombre: 'Dúo clásico', emoji: '👫', precio: 320, fotoEsp: 'clasica', desc: '2 pizzas medianas Clásica + 1 refresco de 2 L.' },
+  { id: 'fiesta', nombre: 'Fiesta', emoji: '🎉', precio: 399, fotoEsp: 'pepechon', desc: '1 pizza familiar Pepechon + 3 calzones + 2 refrescos de 2 L.' },
 ]
 
 export const ADICIONALES = {
