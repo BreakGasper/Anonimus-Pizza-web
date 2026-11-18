@@ -6,6 +6,7 @@ import { auth } from '../firebase/auth.js'
 import { DOMINIO_ADMIN } from '../firebase/claves.js'
 import { db } from '../firebase/db.js'
 import { money } from '../data/menu.js'
+import Icono from '../components/Icono.vue'
 import { leerHistorial, borrarHistorial, CLAVE_SESION } from '../store/historial.js'
 import TicketPedido from '../components/TicketPedido.vue'
 
@@ -164,7 +165,7 @@ const inicial = computed(() => (usuario.value?.displayName || usuario.value?.ema
         </label>
         <label class="campo">Contraseña
           <span class="clave"><input v-model="clave" :type="verClave ? 'text' : 'password'" :autocomplete="modo === 'crear' ? 'new-password' : 'current-password'" />
-            <button type="button" class="ojo" :aria-label="verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'" @click="verClave = !verClave">{{ verClave ? '🙈' : '👁️' }}</button></span>
+            <button type="button" class="ojo" :aria-label="verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'" @click="verClave = !verClave"><Icono :nombre="verClave ? 'ojoCerrado' : 'ojo'" :tam="20" /></button></span>
         </label>
         <p v-if="error" class="error" role="alert">{{ error }}</p>
         <p v-if="info" class="aviso" role="status">{{ info }}</p>

@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { doc, onSnapshot, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore'
+import Icono from './Icono.vue'
+import { ICONOS_PRODUCTO, iconoProducto } from '../utils/iconos.js'
 import { dbAdmin as db } from '../firebase/admin.js'
 import { MENU_INICIAL, ARMA, money, TITULOS_CATEGORIA } from '../data/menu.js'
 import { normalizar, FOTOS_BIBLIOTECA, fotoDe, hayPromo, precioFinal, fotosSubidas } from '../store/menu.js'
@@ -79,7 +81,7 @@ const conteo = computed(() => ({
   promos: items.value.filter((i) => i.enPromo).length,
   ocultos: items.value.filter((i) => !i.activo).length,
 }))
-const FILTROS = [['todos', 'Todos'], ['especialidad', 'Especialidades'], ['paquete', 'Paquetes'], ['adicional', 'Adicionales'], ['favoritas', '⭐ Favoritas'], ['promos', '🏷️ Promos'], ['ocultos', 'Ocultos']]
+const FILTROS = [['todos', 'Todos'], ['especialidad', 'Especialidades'], ['paquete', 'Paquetes'], ['adicional', 'Adicionales'], ['favoritas', 'Favoritas'], ['promos', 'Promos'], ['ocultos', 'Ocultos']]
 const lista = computed(() => items.value.filter((i) => {
   if (filtro.value === 'todos') return true
   if (filtro.value === 'favoritas') return i.favorita
@@ -201,7 +203,7 @@ async function guardarEd() {
   }
   const item = normalizar({
     ...e, nombre: e.nombre.trim(), desc: e.desc.trim(), precio: Number(e.precio), precioPromo: e.enPromo ? Number(e.precioPromo) : (e.precioPromo === '' ? null : Number(e.precioPromo) || null),
-    emoji: e.emoji.trim(), foto: fotoFinal, categoria: e.tipo === 'adicional' ? e.categoria : '',
+    icono: e.icono, foto: fotoFinal, categoria: e.tipo === 'adicional' ? e.categoria : '',
     ingredientes: e.tipo === 'especialidad' ? e.ingredientes : [], id: e.esNuevo ? nuevoId(e.tipo) : e.id,
   })
   const nuevos = e.esNuevo ? [...items.value, item] : items.value.map((x) => (x.id === item.id ? item : x))
@@ -236,13 +238,13 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
       <div class="am-lista">
         <article v-for="it in lista" :key="it.id" :class="['tarjeta', 'am-item', { oculto: !it.activo }]">
           <div class="fila" style="align-items:flex-start">
-            <div class="am-foto" aria-hidden="true"><img v-if="fotoDe(it)" :src="fotoDe(it)" alt="" width="64" height="64" /><span v-else>{{ it.emoji || '🍕' }}</span></div>
+            <div class="am-foto" aria-hidden="true"><img v-if="fotoDe(it)" :src="fotoDe(it)" alt="" width="64" height="64" /><span v-else><Icono :nombre="iconoProducto(it)" :tam="30" /></span></div>
             <div class="grow">
               <b class="am-nombre">{{ it.nombre }}</b>
               <div class="desc">{{ TIPOS[it.tipo] }}<template v-if="it.tipo === 'adicional'"> · {{ TITULOS_CATEGORIA[it.categoria] || 'Otros' }}</template></div>
               <div class="insignias">
-                <span v-if="it.favorita" class="ins fav">⭐ Favorita</span>
-                <span v-if="hayPromo(it)" class="ins promo">🏷️ Promo</span>
+                <span v-if="it.favorita" class="ins fav"><Icono nombre="estrella" :tam="12" class="txt" />Favorita</span>
+                <span v-if="hayPromo(it)" class="ins promo"><Icono nombre="etiqueta" :tam="12" class="txt" />Promo</span>
                 <span v-if="!it.activo" class="ins oculto">Oculto</span>
               </div>
             </div>
@@ -250,12 +252,12 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
           </div>
           <div class="acciones">
             <button class="btn chico claro" @click="abrir(it)">Editar</button>
-            <button class="btn chico claro" :aria-pressed="it.favorita" :title="it.favorita ? 'Quitar de favoritas' : 'Marcar como favorita'" @click="alternarFavorita(it)">{{ it.favorita ? '★' : '☆' }} Favorita</button>
+            <button class="btn chico claro" :aria-pressed="it.favorita" :title="it.favorita ? 'Quitar de favoritas' : 'Marcar como favorita'" @click="alternarFavorita(it)"><Icono nombre="estrella" :tam="16" class="txt" :class="{ llena: it.favorita }" />Favorita</button>
             <button class="btn chico claro" @click="alternarActivo(it)">{{ it.activo ? 'Ocultar' : 'Mostrar' }}</button>
-            <button class="btn chico claro" :disabled="!puedeMover(it, -1)" aria-label="Subir" title="Subir" @click="mover(it, -1)">↑</button>
-            <button class="btn chico claro" :disabled="!puedeMover(it, 1)" aria-label="Bajar" title="Bajar" @click="mover(it, 1)">↓</button>
+            <button class="btn chico claro" :disabled="!puedeMover(it, -1)" aria-label="Subir" title="Subir" @click="mover(it, -1)"><Icono nombre="arriba" :tam="16" /></button>
+            <button class="btn chico claro" :disabled="!puedeMover(it, 1)" aria-label="Bajar" title="Bajar" @click="mover(it, 1)"><Icono nombre="flecha" :tam="16" /></button>
             <button class="btn chico claro" @click="duplicar(it)">Duplicar</button>
-            <button class="btn chico basura-btn" :aria-label="'Borrar ' + it.nombre" @click="borrar(it)">🗑</button>
+            <button class="btn chico basura-btn" :aria-label="'Borrar ' + it.nombre" @click="borrar(it)"><Icono nombre="basura" :tam="18" /></button>
           </div>
         </article>
       </div>
@@ -265,7 +267,7 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
     <!-- Editor -->
     <div v-if="ed" class="modal" role="dialog" aria-modal="true" :aria-label="ed.esNuevo ? 'Agregar producto' : 'Editar producto'" @keydown.esc="cerrar" @click.self="cerrar">
       <form class="modal-caja" @submit.prevent="guardarEd" novalidate>
-        <div class="modal-cab"><h3 style="margin:0">{{ ed.esNuevo ? 'Agregar al menú' : 'Editar producto' }}</h3><button type="button" class="cerrar" aria-label="Cerrar" @click="cerrar">✕</button></div>
+        <div class="modal-cab"><h3 style="margin:0">{{ ed.esNuevo ? 'Agregar al menú' : 'Editar producto' }}</h3><button type="button" class="cerrar" aria-label="Cerrar" @click="cerrar"><Icono nombre="cerrar" :tam="20" /></button></div>
 
         <div class="dos">
           <label class="campo">Tipo
@@ -286,8 +288,8 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
           <label class="campo">{{ ed.tipo === 'especialidad' ? 'Precio mediana ($)' : 'Precio ($)' }}
             <input v-model="ed.precio" type="number" inputmode="decimal" min="1" step="1" />
           </label>
-          <label class="campo">Emoji (si no hay foto)
-            <input v-model="ed.emoji" maxlength="4" placeholder="🍕" />
+          <label class="campo">Ícono (si no hay foto)
+            <select v-model="ed.icono"><option v-for="[id, nom] in ICONOS_PRODUCTO" :key="id" :value="id">{{ nom }}</option></select>
           </label>
         </div>
         <p v-if="ed.tipo === 'especialidad'" class="desc" style="margin:-4px 0 10px">Los precios de individual y familiar se calculan solos a partir del de la mediana.</p>
@@ -302,7 +304,7 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
         </fieldset>
 
         <div class="dos checks">
-          <label class="check"><input type="checkbox" v-model="ed.favorita" /> ⭐ Favorita (sale en el inicio)</label>
+          <label class="check"><input type="checkbox" v-model="ed.favorita" /> Favorita (sale en el inicio)</label>
           <label class="check"><input type="checkbox" v-model="ed.activo" /> Visible en la tienda</label>
         </div>
 
@@ -315,7 +317,7 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
             <label class="check"><input type="radio" value="url" :checked="modoFoto === 'url'" @change="elegirModoFoto('url')" /> Dirección de imagen</label>
           </div>
           <div v-if="modoFoto === 'subida'" class="subida">
-            <div class="previa" aria-hidden="true"><img v-if="previa" :src="previa" alt="" width="96" height="96" /><span v-else>📷</span></div>
+            <div class="previa" aria-hidden="true"><img v-if="previa" :src="previa" alt="" width="96" height="96" /><span v-else><Icono nombre="camara" :tam="34" /></span></div>
             <div class="subida-acciones">
               <label class="btn chico claro archivo">{{ previa ? 'Cambiar foto' : 'Elegir foto' }}<input type="file" accept="image/*" hidden @change="alElegirArchivo" /></label>
               <button v-if="previa" type="button" class="btn chico claro" @click="quitarFoto">Quitar foto</button>

@@ -5,6 +5,8 @@ import { ARMA, TAMANOS, precioPorTamano, money } from '../data/menu.js'
 import { recetas, fotoDe } from '../store/menu.js'
 import { agregar } from '../store/cart.js'
 import { avisar } from '../store/toast.js'
+import Icono from '../components/Icono.vue'
+import { iconoProducto } from '../utils/iconos.js'
 import Tamanos from '../components/Tamanos.vue'
 import PizzaPreview from '../components/PizzaPreview.vue'
 import { imgIcono } from '../data/imagenes.js'
@@ -172,9 +174,9 @@ function pedir() {
         <p class="desc" style="margin-bottom:8px">Toca una especialidad y ajústala a tu gusto, o deja que te sorprendamos.</p>
         <div class="rapido">
           <button v-for="e in recetas" :key="e.id" type="button" :class="['chip esp', { on: esReceta(e) }]" :aria-pressed="esReceta(e)" @click="aplicar(e.ingredientes)">
-            <img v-if="fotoDe(e)" :src="fotoDe(e)" alt="" width="30" height="30" /><span v-else class="mini-emoji" aria-hidden="true">{{ e.emoji || '🍕' }}</span>{{ e.nombre }}
+            <img v-if="fotoDe(e)" :src="fotoDe(e)" alt="" width="30" height="30" /><span v-else class="mini-emoji" aria-hidden="true"><Icono :nombre="iconoProducto(e)" :tam="20" /></span>{{ e.nombre }}
           </button>
-          <button type="button" class="chip sorpresa" @click="sorprender">🎲 Sorpréndeme</button>
+          <button type="button" class="chip sorpresa" @click="sorprender"><Icono nombre="dado" :tam="18" class="txt" />Sorpréndeme</button>
         </div>
       </section>
 
@@ -216,7 +218,7 @@ function pedir() {
         <p class="pie-pizza">{{ tam.nombre }} · {{ tam.cm }}</p>
         <p v-if="!elegidos.length" class="desc" style="text-align:center">Suelta aquí los ingredientes que quieras.</p>
         <div v-else class="lleva">
-          <button v-for="ing in elegidos" :key="ing" type="button" class="quitar-ing" :aria-label="'Quitar ' + ing" @click="quitar(ing)">{{ ing }} ✕</button>
+          <button v-for="ing in elegidos" :key="ing" type="button" class="quitar-ing" :aria-label="'Quitar ' + ing" @click="quitar(ing)">{{ ing }}<Icono nombre="cerrar" :tam="14" class="fin" /></button>
         </div>
       </div>
 
@@ -241,7 +243,7 @@ function pedir() {
   <div v-if="!esEscritorio && elegidos.length" class="relleno-barra"></div>
   <div v-if="!esEscritorio && elegidos.length" class="barra-pedir" role="region" aria-label="Tu pizza">
     <div class="barra-in">
-      <button v-if="!pizzaVisible" type="button" class="btn claro chico" @click="irAPizza">Ver pizza ↓</button>
+      <button v-if="!pizzaVisible" type="button" class="btn claro chico" @click="irAPizza">Ver pizza<Icono nombre="flecha" :tam="16" class="fin" /></button>
       <div class="grow"><b>{{ money(precio) }}</b></div>
       <button class="btn" @click="pedir">Agregar al carrito</button>
     </div>

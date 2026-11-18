@@ -10,13 +10,13 @@ export const precioPorTamano = (precioMediana, tamano) =>
   Math.round((precioMediana * tamano.factor) / 5) * 5
 
 export const ESPECIALIDADES = [
-  { id: 'solitaria', nombre: 'Solitaria', emoji: '🍍', precio: 175, ingredientes: ['Pepperoni'], desc: 'Pepperoni sobre queso mozzarella.' },
-  { id: 'clasica', nombre: 'Clásica', emoji: '🍕', precio: 150, ingredientes: ['Jamón', 'Piña', 'Champiñones', 'Pimiento verde'], desc: 'Jamón, piña, champiñones y pimiento verde.' },
-  { id: 'pepechon', nombre: 'Pepechon', emoji: '🌶️', precio: 165, ingredientes: ['Pepperoni', 'Champiñones'], desc: 'Pepperoni y champiñones.' },
-  { id: 'ambivalente', nombre: 'Ambivalente', emoji: '🧀', precio: 170, ingredientes: ['Jamón', 'Piña'], desc: 'Jamón y piña.' },
-  { id: 'carnivora', nombre: 'Carnívora', emoji: '🥩', precio: 185, ingredientes: ['Pepperoni', 'Jamón', 'Salchicha'], desc: 'Pepperoni, jamón y salchicha.' },
-  { id: 'vegetariana', nombre: 'Vegetariana', emoji: '🥬', precio: 160, ingredientes: ['Champiñones', 'Cebolla', 'Pimiento verde', 'Aceitunas negras'], desc: 'Champiñones, cebolla, pimiento verde y aceitunas negras.' },
-  { id: 'rinconada', nombre: 'Rinconada', emoji: '🔥', precio: 180, ingredientes: ['Salchicha italiana', 'Chorizo', 'Cebolla', 'Jalapeño'], desc: 'Salchicha italiana, chorizo, cebolla y jalapeño.' },
+  { id: 'solitaria', nombre: 'Solitaria', icono: 'pina', precio: 175, ingredientes: ['Pepperoni'], desc: 'Pepperoni sobre queso mozzarella.' },
+  { id: 'clasica', nombre: 'Clásica', icono: 'pizza', precio: 150, ingredientes: ['Jamón', 'Piña', 'Champiñones', 'Pimiento verde'], desc: 'Jamón, piña, champiñones y pimiento verde.' },
+  { id: 'pepechon', nombre: 'Pepechon', icono: 'chile', precio: 165, ingredientes: ['Pepperoni', 'Champiñones'], desc: 'Pepperoni y champiñones.' },
+  { id: 'ambivalente', nombre: 'Ambivalente', icono: 'queso', precio: 170, ingredientes: ['Jamón', 'Piña'], desc: 'Jamón y piña.' },
+  { id: 'carnivora', nombre: 'Carnívora', icono: 'carne', precio: 185, ingredientes: ['Pepperoni', 'Jamón', 'Salchicha'], desc: 'Pepperoni, jamón y salchicha.' },
+  { id: 'vegetariana', nombre: 'Vegetariana', icono: 'hoja', precio: 160, ingredientes: ['Champiñones', 'Cebolla', 'Pimiento verde', 'Aceitunas negras'], desc: 'Champiñones, cebolla, pimiento verde y aceitunas negras.' },
+  { id: 'rinconada', nombre: 'Rinconada', icono: 'fuego', precio: 180, ingredientes: ['Salchicha italiana', 'Chorizo', 'Cebolla', 'Jalapeño'], desc: 'Salchicha italiana, chorizo, cebolla y jalapeño.' },
 ]
 
 // "Arma tu pizza": precio base de la mediana con 3 ingredientes incluidos.
@@ -33,21 +33,21 @@ export const ARMA = {
 }
 
 export const PAQUETES = [
-  { id: 'solo', nombre: 'Solo para ti', emoji: '🙋', precio: 99, fotoEsp: 'clasica', desc: '1 pizza individual Clásica + 1 refresco de lata.' },
-  { id: 'duo', nombre: 'Dúo clásico', emoji: '👫', precio: 320, fotoEsp: 'clasica', desc: '2 pizzas medianas Clásica + 1 refresco de 2 L.' },
-  { id: 'fiesta', nombre: 'Fiesta', emoji: '🎉', precio: 399, fotoEsp: 'pepechon', desc: '1 pizza familiar Pepechon + 3 calzones + 2 refrescos de 2 L.' },
+  { id: 'solo', nombre: 'Solo para ti', icono: 'usuario', precio: 99, fotoEsp: 'clasica', desc: '1 pizza individual Clásica + 1 refresco de lata.' },
+  { id: 'duo', nombre: 'Dúo clásico', icono: 'pareja', precio: 320, fotoEsp: 'clasica', desc: '2 pizzas medianas Clásica + 1 refresco de 2 L.' },
+  { id: 'fiesta', nombre: 'Fiesta', icono: 'fiesta', precio: 399, fotoEsp: 'pepechon', desc: '1 pizza familiar Pepechon + 3 calzones + 2 refrescos de 2 L.' },
 ]
 
 export const ADICIONALES = {
   calzones: [
-    { id: 'calz-solitario', nombre: 'Calzone Solitario', emoji: '🥟', precio: 70, desc: 'Jamón, salchicha, pepperoni, champiñones y piña.' },
-    { id: 'calz-clasico', nombre: 'Calzone Clásico', emoji: '🥟', precio: 65, desc: 'Queso mozzarella y pepperoni.' },
-    { id: 'calz-veg', nombre: 'Calzone Vegetariano', emoji: '🥟', precio: 65, desc: 'Champiñones, pimiento y elote.' },
+    { id: 'calz-solitario', nombre: 'Calzone Solitario', icono: 'calzone', precio: 70, desc: 'Jamón, salchicha, pepperoni, champiñones y piña.' },
+    { id: 'calz-clasico', nombre: 'Calzone Clásico', icono: 'calzone', precio: 65, desc: 'Queso mozzarella y pepperoni.' },
+    { id: 'calz-veg', nombre: 'Calzone Vegetariano', icono: 'calzone', precio: 65, desc: 'Champiñones, pimiento y elote.' },
   ],
   bebidas: [
-    { id: 'beb-lata', nombre: 'Refresco de lata', emoji: '🥤', precio: 25, desc: 'Cualquier sabor, 355 ml.' },
-    { id: 'beb-2l', nombre: 'Refresco de 2 L', emoji: '🥤', precio: 45, desc: 'Cualquier sabor.' },
-    { id: 'beb-agua', nombre: 'Agua natural', emoji: '💧', precio: 20, desc: '600 ml.' },
+    { id: 'beb-lata', nombre: 'Refresco de lata', icono: 'bebida', precio: 25, desc: 'Cualquier sabor, 355 ml.' },
+    { id: 'beb-2l', nombre: 'Refresco de 2 L', icono: 'bebida', precio: 45, desc: 'Cualquier sabor.' },
+    { id: 'beb-agua', nombre: 'Agua natural', icono: 'agua', precio: 20, desc: '600 ml.' },
   ],
 }
 
@@ -57,13 +57,13 @@ export const money = (n) => '$' + Number(n).toLocaleString('es-MX')
    Es lo que se muestra mientras no exista el menú guardado en Firestore (config/menu) y lo que el panel
    de administración carga la primera vez. Cada elemento:
    { id, tipo: 'especialidad' | 'paquete' | 'adicional', categoria ('calzones' | 'bebidas' | 'otros', solo adicionales),
-     nombre, desc, precio, precioPromo, enPromo, favorita, activo, emoji, foto ('lib:clave' | 'https://…' | ''), ingredientes[] } */
+     nombre, desc, precio, precioPromo, enPromo, favorita, activo, icono, foto ('lib:clave' | 'https://…' | ''), ingredientes[] } */
 const base = { precioPromo: null, enPromo: false, favorita: false, activo: true, ingredientes: [], categoria: '', foto: '' }
 export const MENU_INICIAL = [
-  ...ESPECIALIDADES.map((e) => ({ ...base, id: e.id, tipo: 'especialidad', nombre: e.nombre, desc: e.desc, precio: e.precio, emoji: e.emoji, foto: 'lib:' + e.id, ingredientes: [...e.ingredientes], favorita: true })),
-  ...PAQUETES.map((p) => ({ ...base, id: p.id, tipo: 'paquete', nombre: p.nombre, desc: p.desc, precio: p.precio, emoji: p.emoji, foto: 'lib:' + p.fotoEsp })),
-  ...ADICIONALES.calzones.map((a) => ({ ...base, id: a.id, tipo: 'adicional', categoria: 'calzones', nombre: a.nombre, desc: a.desc, precio: a.precio, emoji: a.emoji, foto: 'lib:calzone' })),
-  ...ADICIONALES.bebidas.map((a) => ({ ...base, id: a.id, tipo: 'adicional', categoria: 'bebidas', nombre: a.nombre, desc: a.desc, precio: a.precio, emoji: a.emoji })),
+  ...ESPECIALIDADES.map((e) => ({ ...base, id: e.id, tipo: 'especialidad', nombre: e.nombre, desc: e.desc, precio: e.precio, icono: e.icono, foto: 'lib:' + e.id, ingredientes: [...e.ingredientes], favorita: true })),
+  ...PAQUETES.map((p) => ({ ...base, id: p.id, tipo: 'paquete', nombre: p.nombre, desc: p.desc, precio: p.precio, icono: p.icono, foto: 'lib:' + p.fotoEsp })),
+  ...ADICIONALES.calzones.map((a) => ({ ...base, id: a.id, tipo: 'adicional', categoria: 'calzones', nombre: a.nombre, desc: a.desc, precio: a.precio, icono: a.icono, foto: 'lib:calzone' })),
+  ...ADICIONALES.bebidas.map((a) => ({ ...base, id: a.id, tipo: 'adicional', categoria: 'bebidas', nombre: a.nombre, desc: a.desc, precio: a.precio, icono: a.icono })),
 ]
 
 export const TITULOS_CATEGORIA = { calzones: 'Calzones', bebidas: 'Bebidas', otros: 'Otros' }

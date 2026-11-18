@@ -6,7 +6,7 @@ import MenuTabs from '../components/MenuTabs.vue'
 import ProductoCard from '../components/ProductoCard.vue'
 
 function pedir(p) {
-  const ok = agregar({ clave: `paq-${p.id}`, nombre: p.nombre, detalle: p.desc, precio: precioFinal(p), foto: p.foto || undefined, emoji: p.emoji })
+  const ok = agregar({ clave: `paq-${p.id}`, nombre: p.nombre, detalle: p.desc, precio: precioFinal(p), foto: p.foto || undefined, icono: p.icono })
   avisar(ok ? `${p.nombre} agregado` : 'El carrito está lleno')
 }
 </script>
@@ -18,6 +18,6 @@ function pedir(p) {
   <p v-if="!paquetes.length" class="sub">Por ahora no hay paquetes disponibles.</p>
   <div class="grilla">
     <ProductoCard v-for="p in paquetes" :key="p.id" :nombre="p.nombre" :desc="p.desc" :precio="precioFinal(p)" :precio-original="hayPromo(p) ? p.precio : undefined"
-      :foto="fotoDe(p)" :emoji="p.emoji" etiqueta="Promo" @agregar="pedir(p)" />
+      :foto="fotoDe(p)" :icono="p.icono" etiqueta="Promo" @agregar="pedir(p)" />
   </div>
 </template>

@@ -228,3 +228,14 @@ label.campo { display: block; margin-bottom: 12px; font-weight: 600; font-size: 
 .perfil-pildora { display: none; }
 .perfil-pildora.on { background: var(--rojo); border-color: var(--rojo); color: #fff; }
 @media (min-width: 720px) { .perfil-pildora { display: inline-flex; } }
+
+/* Íconos de línea (Icono.vue): alineados al texto */
+.icono { display: inline-block; vertical-align: -.2em; flex: none; }
+.icono.txt { margin-right: .4em; }
+.icono.fin { margin-left: .4em; margin-right: 0; }
+
+.prod-emoji, .fav-emoji, .am-foto > span, .previa > span, .chip.esp .mini-emoji, .mini > span { color: var(--ambar); }
+.promo-ico { width: 56px; height: 56px; border-radius: 50%; background: #ffffff1f; display: grid; place-items: center; flex: none; color: #fff; }
+.ojo { color: var(--suave, #b9b0a6); display: grid; place-items: center; }
+.icono.llena { fill: currentColor; }
+.ins .icono { vertical-align: -.15em; }

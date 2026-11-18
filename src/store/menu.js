@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { MENU_INICIAL, precioPorTamano } from '../data/menu.js'
 import { imgEspecialidad, imgCalzone, imgBase } from '../data/imagenes.js'
 import { firebaseConfig } from '../firebase/claves.js'
+import { iconoProducto } from '../utils/iconos.js'
 
 // ---------- Normalización: el menú guardado puede traer campos faltantes ----------
 export function normalizar(it) {
@@ -10,7 +11,7 @@ export function normalizar(it) {
     id: String(it.id || ''), tipo: ['especialidad', 'paquete', 'adicional'].includes(it.tipo) ? it.tipo : 'adicional',
     categoria: String(it.categoria || ''), nombre: String(it.nombre || '').slice(0, 80), desc: String(it.desc || '').slice(0, 220),
     precio: n(it.precio), precioPromo: it.precioPromo == null || it.precioPromo === '' ? null : n(it.precioPromo), enPromo: !!it.enPromo,
-    favorita: !!it.favorita, activo: it.activo !== false, emoji: String(it.emoji || ''), foto: String(it.foto || ''),
+    favorita: !!it.favorita, activo: it.activo !== false, icono: iconoProducto(it), foto: String(it.foto || ''),
     ingredientes: Array.isArray(it.ingredientes) ? it.ingredientes.map(String) : [],
   }
 }
