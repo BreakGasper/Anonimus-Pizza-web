@@ -17,6 +17,14 @@ const admin = env.authenticatedContext('a', { email: ADMIN, email_verified: true
 const adminNoVerif = env.authenticatedContext('b', { email: ADMIN, email_verified: false }).firestore()
 const otro = env.authenticatedContext('c', { email: 'otro@x.com', email_verified: true }).firestore()
 
+// Cuenta de la lista /admins (se crea "desde la consola": con las reglas desactivadas)
+await env.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), 'admins/uadmin'), { nombre: 'Admin' })
+  await setDoc(doc(ctx.firestore(), 'pedidos/semilla'), { ...valido(), creado: new Date() })
+})
+const listaAdmin = env.authenticatedContext('uadmin', { email: '3750000000@admin.anonimus.pizza' }).firestore()
+const sinLista = env.authenticatedContext('uotro', { email: '3750000001@admin.anonimus.pizza' }).firestore()
+
 let fallos = 0
 async function t(nombre, p) {
   try { await p; console.log('OK  ', nombre) } catch (e) { fallos++; console.log('FALLA', nombre, e.message.split('\n')[0]) }
@@ -37,6 +45,18 @@ await t('admin lee', assertSucceeds(getDoc(doc(admin, 'pedidos/p1'))))
 await t('admin edita', assertSucceeds(updateDoc(doc(admin, 'pedidos/p1'), { estado: 'listo' })))
 await t('admin borra', assertSucceeds(deleteDoc(doc(admin, 'pedidos/p1'))))
 await t('colección desconocida cerrada', assertFails(setDoc(doc(admin, 'otra/x'), { a: 1 })))
+
+await t('cuenta de /admins lee pedidos', assertSucceeds(getDoc(doc(listaAdmin, 'pedidos/semilla'))))
+await t('cuenta de /admins edita pedidos', assertSucceeds(updateDoc(doc(listaAdmin, 'pedidos/semilla'), { estado: 'preparando' })))
+await t('cuenta de /admins borra pedidos', assertSucceeds(deleteDoc(doc(listaAdmin, 'pedidos/semilla'))))
+await t('cuenta fuera de /admins NO lee pedidos', assertFails(getDoc(doc(sinLista, 'pedidos/semilla'))))
+await t('cuenta fuera de /admins NO edita pedidos', assertFails(updateDoc(doc(sinLista, 'pedidos/semilla'), { estado: 'listo' })))
+await t('nadie puede agregarse a /admins (ni un admin)', assertFails(setDoc(doc(listaAdmin, 'admins/uotro'), { nombre: 'x' })))
+await t('un usuario no puede hacerse admin a sí mismo', assertFails(setDoc(doc(sinLista, 'admins/uotro'), { nombre: 'x' })))
+await t('un admin lee su propio registro', assertSucceeds(getDoc(doc(listaAdmin, 'admins/uadmin'))))
+await t('no se puede leer el registro de otro', assertFails(getDoc(doc(sinLista, 'admins/uadmin'))))
+await t('visitante anónimo NO lee /admins', assertFails(getDoc(doc(anon, 'admins/uadmin'))))
+await t('los visitantes siguen creando pedidos válidos', assertSucceeds(setDoc(doc(anon, 'pedidos/nuevo1'), valido())))
 
 await env.cleanup()
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodas las pruebas pasaron')
