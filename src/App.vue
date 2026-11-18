@@ -23,10 +23,13 @@ const esAdmin = computed(() => !!route.meta.admin)
       <router-link to="/paquetes" active-class="on">Paquetes</router-link>
       <router-link to="/adicionales" active-class="on">Adicionales</router-link>
     </nav>
+    <div class="cab-der">
+    <router-link to="/perfil" class="pildora perfil-pildora" active-class="on" aria-label="Mi perfil"><Icono nombre="usuario" :tam="20" /><span>Perfil</span></router-link>
     <router-link to="/carrito" class="pildora" aria-label="Ver carrito">
       <Icono nombre="carrito" :tam="20" /><span class="solo-escritorio-flex">Carrito</span>
       <span v-if="cantidad" class="badge">{{ cantidad }}</span>
     </router-link>
+    </div>
   </header>
 
   <main :class="['pagina', { admin: esAdmin }]">
@@ -39,7 +42,7 @@ const esAdmin = computed(() => !!route.meta.admin)
     <router-link to="/" exact-active-class="on"><Icono nombre="inicio" />Inicio</router-link>
     <router-link to="/especialidades" active-class="on"><Icono nombre="carta" />Menú</router-link>
     <router-link to="/arma" class="centro" active-class="on"><span class="burbuja"><Icono nombre="pizza" :tam="28" /></span><span>Arma</span></router-link>
-    <router-link to="/paquetes" active-class="on"><Icono nombre="promo" />Promos</router-link>
+    <router-link to="/perfil" active-class="on"><Icono nombre="usuario" />Perfil</router-link>
     <router-link to="/carrito" active-class="on"><span class="nav-icono"><Icono nombre="carrito" /><i v-if="cantidad" class="nav-badge">{{ cantidad }}</i></span>Carrito</router-link>
   </nav>
 </template>

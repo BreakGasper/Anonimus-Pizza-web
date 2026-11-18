@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing'
-import { serverTimestamp, doc, setDoc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore'
+import { serverTimestamp, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, collection, query, where } from 'firebase/firestore'
 
 const ADMIN = 'breakgasper@gmail.com'
 const env = await initializeTestEnvironment({
@@ -67,6 +67,26 @@ await t('cuenta de /admins escribe el menú', assertSucceeds(setDoc(doc(listaAdm
 await t('el menú debe traer una lista items', assertFails(setDoc(doc(listaAdmin, 'config/menu'), { items: 'x' })))
 await t('el menú no puede pasar de 150 elementos', assertFails(setDoc(doc(listaAdmin, 'config/menu'), { items: Array.from({ length: 151 }, (_, i) => ({ id: String(i) })) })))
 await t('otros documentos de config siguen cerrados para escritura', assertFails(setDoc(doc(anon, 'config/otro'), menu())))
+
+// ---- Clientes con cuenta: ven solo sus pedidos ----
+const ana = env.authenticatedContext('ana', { email: 'ana@correo.com' }).firestore()
+const beto = env.authenticatedContext('beto', { email: 'beto@correo.com' }).firestore()
+await t('cliente con sesión crea un pedido a su nombre (uid)', assertSucceeds(setDoc(doc(ana, 'pedidos/ped-ana'), { ...valido(), uid: 'ana' })))
+await t('cliente NO puede crear un pedido a nombre de otro', assertFails(setDoc(doc(ana, 'pedidos/ped-falso'), { ...valido(), uid: 'beto' })))
+await t('visitante sin sesión NO puede poner uid', assertFails(setDoc(doc(anon, 'pedidos/ped-anon-uid'), { ...valido(), uid: 'ana' })))
+await t('el visitante sin cuenta sigue creando pedidos (sin uid)', assertSucceeds(setDoc(doc(anon, 'pedidos/ped-invitado'), valido())))
+await t('el uid debe ser texto igual al de la sesión (no un campo suelto)', assertFails(setDoc(doc(ana, 'pedidos/ped-raro'), { ...valido(), uid: 123 })))
+await t('el dueño lee su pedido', assertSucceeds(getDoc(doc(ana, 'pedidos/ped-ana'))))
+await t('el dueño lista sus pedidos (where uid == suyo)', assertSucceeds(getDocs(query(collection(ana, 'pedidos'), where('uid', '==', 'ana')))))
+await t('otro cliente NO lee un pedido ajeno', assertFails(getDoc(doc(beto, 'pedidos/ped-ana'))))
+await t('otro cliente NO lista pedidos ajenos (where uid == ana)', assertFails(getDocs(query(collection(beto, 'pedidos'), where('uid', '==', 'ana')))))
+await t('un cliente NO puede listar todos los pedidos', assertFails(getDocs(collection(ana, 'pedidos'))))
+await t('el visitante NO lee pedidos con uid', assertFails(getDoc(doc(anon, 'pedidos/ped-ana'))))
+await t('el cliente NO lee un pedido de invitado (sin uid)', assertFails(getDoc(doc(ana, 'pedidos/ped-invitado'))))
+await t('el dueño NO edita su pedido (ni cambia el estado)', assertFails(updateDoc(doc(ana, 'pedidos/ped-ana'), { estado: 'entregado' })))
+await t('el dueño NO borra su pedido', assertFails(deleteDoc(doc(ana, 'pedidos/ped-ana'))))
+await t('el admin sigue leyendo y cambiando pedidos con uid', assertSucceeds(updateDoc(doc(listaAdmin, 'pedidos/ped-ana'), { estado: 'preparando' })))
+await t('el dueño ve el cambio de estado hecho por el admin', assertSucceeds(getDoc(doc(ana, 'pedidos/ped-ana'))))
 
 await env.cleanup()
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodas las pruebas pasaron')
