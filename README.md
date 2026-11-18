@@ -16,7 +16,7 @@ App web para hacer **pedidos de pizzas a domicilio**, personalizadas, con entreg
 - Pensada para móvil (barra inferior, sin zoom accidental) y escritorio (menú superior, 2 columnas en "Arma tu pizza"). Interfaz en español, tema oscuro "horno" y un solo set de íconos de línea.
 
 **Para el personal (`/admin`)**
-- Pedidos en vivo con aviso sonoro; avanzar estado (nuevo → preparando → en camino → entregado) o **cancelar** (los pedidos no se borran).
+- Pedidos en vivo con aviso sonoro y notificaciones en el teléfono; avanzar estado (nuevo → preparando → en camino → entregado) o **cancelar** (los pedidos no se borran).
 - Menú editable: productos, precios, promociones, favoritas, ocultar/ordenar, **fotos** (cámara o galería), ícono de respaldo.
 - **Resumen** de ventas por periodo (vendidos, cancelados, ticket promedio, gráfica de 7 días, lo más vendido).
 - **Usuarios** del panel con tres perfiles (ver tabla).
@@ -39,6 +39,14 @@ Las **reglas de Firestore** hacen cumplir los permisos (no solo la pantalla).
 - El personal entra con **teléfono + contraseña** (Firebase Authentication; internamente `<10 dígitos>@admin.anonimus.pizza`). El administrador original también puede entrar con Google. Ni teléfonos ni contraseñas están en el código.
 - Un perfil `activo: false` no tiene ningún acceso. No se puede desactivar la propia cuenta ni al último admin.
 - El panel usa su **propia sesión** de Firebase (app "admin"), separada de la de los clientes; las cuentas `@admin.anonimus.pizza` no pueden registrarse ni entrar como clientes.
+
+## Avisos de pedidos nuevos en el teléfono
+
+El panel se puede **instalar en la pantalla de inicio** (Android: menú del navegador → *Instalar app*; iPhone: Compartir → *Agregar a pantalla de inicio*, iOS 16.4 o superior). Cada persona del panel (admin, tienda o empleado) toca **Activar avisos** y acepta el permiso: desde entonces, cada pedido nuevo muestra una **notificación del sistema** y, al tocarla, se abre el panel en ese pedido (`/admin?pedido=ID`). Los clientes no reciben nada.
+
+- **Límite (plan gratuito):** no hay servidor que envíe avisos (eso pide Cloud Functions y el plan Blaze). Las notificaciones las dispara el propio panel al recibir el pedido en vivo, así que llegan **mientras la app esté abierta o en segundo plano**, no con la app cerrada del todo o el teléfono bloqueado un rato largo. Con los avisos activos el panel pide mantener la pantalla encendida mientras está a la vista.
+- Con el panel a la vista solo suena y se muestra el aviso en pantalla (sin notificación duplicada).
+- Archivos: `public/sw.js` (service worker), `public/admin.webmanifest` y los íconos `public/icono-*.png`.
 
 ## Tecnología
 
