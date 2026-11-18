@@ -13,16 +13,10 @@ const tamano = ref('med')
 const elegidos = ref([])
 const extras = ref([])
 const nombre = ref('')
-// Cada pizza nueva se arma distinta; "Mezclar" la reparte otra vez.
+// Cada pizza nueva (al abrir, con una especialidad o con Sorpréndeme) se arma distinta; después los ingredientes ya puestos no se mueven.
 const nuevaSemilla = () => Math.floor(Math.random() * 2 ** 31)
 const semilla = ref(nuevaSemilla())
 
-// Mezcla automática: cada vez que cambias un ingrediente, la pizza se reparte de nuevo (y las piezas vuelven a caer).
-const CLAVE_AUTO = 'anonimus-mezcla-auto'
-const leerAuto = () => { try { return localStorage.getItem(CLAVE_AUTO) !== '0' } catch { return true } }
-const autoMezcla = ref(leerAuto())
-function guardarAuto() { try { localStorage.setItem(CLAVE_AUTO, autoMezcla.value ? '1' : '0') } catch { /* sin almacenamiento */ } }
-const cambio = () => { if (autoMezcla.value) semilla.value = nuevaSemilla() }
 
 const tam = computed(() => TAMANOS.find((x) => x.id === tamano.value))
 const sobrantes = computed(() => Math.max(0, elegidos.value.length - ARMA.incluidos))
@@ -100,7 +94,7 @@ function soltar(e) {
     setTimeout(() => (ignorarClic = false), 0)
     if (dentro(e)) {
       if (elegidos.value.includes(gesto.nombre)) avisar(`${gesto.nombre} ya está en tu pizza`)
-      else { elegidos.value.push(gesto.nombre); cambio() }
+      else elegidos.value.push(gesto.nombre)
     }
   }
   limpiar()
@@ -111,12 +105,10 @@ function evitarScroll(e) { if (gesto?.activo && e.cancelable) e.preventDefault()
 function clic(ing) {
   if (ignorarClic) return
   alternar(elegidos.value, ing)
-  cambio()
 }
 
 function quitar(ing) {
   alternar(elegidos.value, ing)
-  cambio()
 }
 
 /* ---------- Atajos: especialidad de arranque y "Sorpréndeme" ---------- */
@@ -205,10 +197,6 @@ function pedir() {
   <div ref="zona" :class="['zona-pizza', { activa: sobrePizza, vacia: !elegidos.length }]">
     <PizzaPreview :ingredientes="elegidos" :extras="extras" :tamano="tamano" :activa="sobrePizza" :semilla="semilla" />
     <p class="pie-pizza">{{ tam.nombre }} · {{ tam.cm }}</p>
-    <div v-if="elegidos.length" class="mezcla">
-      <button type="button" class="btn chico claro" @click="semilla = nuevaSemilla()">🔀 Mezclar</button>
-      <label class="auto"><input type="checkbox" v-model="autoMezcla" @change="guardarAuto" /> Mezclar sola al cambiar</label>
-    </div>
     <p v-if="!elegidos.length" class="desc" style="text-align:center">Suelta aquí los ingredientes que quieras.</p>
     <div v-else class="lleva">
       <button v-for="ing in elegidos" :key="ing" type="button" class="quitar-ing" :aria-label="'Quitar ' + ing" @click="quitar(ing)">{{ ing }} ✕</button>
@@ -262,8 +250,6 @@ function pedir() {
 .chip.esp { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 4px; }
 .chip.esp img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
 .chip.sorpresa { background: linear-gradient(135deg, #ff9800, #ff5722); border-color: #ff7a1a; color: #fff; font-weight: 600; }
-.mezcla { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-bottom: 6px; }
-.mezcla .auto { color: #f3dfc7; font-size: .8rem; display: inline-flex; gap: 6px; align-items: center; }
 .relleno-barra { height: 64px; }
 .barra-pedir { position: fixed; left: 0; right: 0; bottom: calc(58px + env(safe-area-inset-bottom, 0px)); z-index: 9; background: rgba(255, 247, 234, .96);
   backdrop-filter: blur(6px); border-top: 1px solid var(--linea); padding: 8px 16px; box-shadow: 0 -4px 14px #0002; }

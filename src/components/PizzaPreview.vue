@@ -12,6 +12,8 @@ const props = defineProps({
 
 const ESCALA = { ind: 0.68, med: 0.84, fam: 1 }
 const DURACION = 480
+// Cada ingrediente lleva siempre la misma cantidad (así los que ya cayeron no cambian al agregar otros).
+const ESCASEZ = 0.8
 const HALO = { pepperoni: 0.5, chorizo: 0.42, salchicha: 0.3, 'salchicha-italiana': 0.36, jamon: 0.16, 'carne-molida': 0.3 }
 const MOVIMIENTO_REDUCIDO = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -111,7 +113,6 @@ function dibujar() {
 
   // ingredientes elegidos, en el orden de apilado
   const elegidos = ordenCapas().filter((n) => props.ingredientes.includes(n)).map(slugDe)
-  const reparto = Math.max(0.6, 1 - 0.07 * (elegidos.length - 1)) // con más ingredientes, menos piezas de cada uno
   const vigentes = new Set()
   let animando = false, pendiente = false
   const ALTO = W * 0.17 // desde qué altura "caen" las piezas
@@ -121,7 +122,7 @@ function dibujar() {
     pedirAtlas(slug)
     const im = atlas.get(slug)
     if (!im || im === 'error') { pendiente = pendiente || im === null; continue }
-    const piezas = colocar(slug), n = Math.min(piezas.length, Math.max(1, Math.round(PIEZAS[slug] * piezas.densidad * reparto)))
+    const piezas = colocar(slug), n = Math.min(piezas.length, Math.max(1, Math.round(PIEZAS[slug] * piezas.densidad * ESCASEZ)))
     const defs = meta.ingredientes[slug].piezas
     let nuevas = 0
     for (let i = 0; i < n; i++) {
