@@ -23,6 +23,13 @@ function leerCache() {
 export const items = ref((leerCache() || MENU_INICIAL).map(normalizar))
 export const cargado = ref(false)
 
+// Fotos subidas desde el panel: { idFoto: 'data:image/webp;base64,…' }. Se descargan solo cuando cambian (versión) y se guardan en el dispositivo.
+const CACHE_FOTOS = 'anonimus-fotos-cache-v1'
+function leerCacheFotos() {
+  try { const v = JSON.parse(localStorage.getItem(CACHE_FOTOS)); return v && typeof v.fotos === 'object' && v.fotos ? v : { version: 0, fotos: {} } } catch { return { version: 0, fotos: {} } }
+}
+export const fotosSubidas = ref(leerCacheFotos().fotos)
+
 // Firestore por REST (un solo documento, sin cargar el SDK en la tienda). El menú es de lectura pública.
 function valor(v) {
   if ('stringValue' in v) return v.stringValue
@@ -35,19 +42,36 @@ function valor(v) {
 }
 const origen = () => (import.meta.env.VITE_EMULATOR === '1' ? 'http://127.0.0.1:8080' : 'https://firestore.googleapis.com')
 
+async function sincronizarFotos(version) {
+  if (!version) { fotosSubidas.value = {}; try { localStorage.removeItem(CACHE_FOTOS) } catch { /* sin almacenamiento */ } return }
+  const cache = leerCacheFotos()
+  if (cache.version === version) { fotosSubidas.value = cache.fotos; return } // sin cambios: no se descarga nada
+  try {
+    const r = await fetch(`${origen()}/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/config/fotos?key=${firebaseConfig.apiKey}`)
+    if (!r.ok) return
+    const doc = await r.json()
+    const fotos = doc.fields?.fotos ? valor(doc.fields.fotos) : {}
+    fotosSubidas.value = fotos || {}
+    try { localStorage.setItem(CACHE_FOTOS, JSON.stringify({ version, fotos: fotosSubidas.value })) } catch { /* sin almacenamiento */ }
+  } catch { /* sin conexión: se quedan las que ya había */ }
+}
+
 export async function cargarMenu() {
   try {
     // Se pide la lista de la colección `config` (responde 200 aunque no exista el menú; un `get` daría 404 y ensucia la consola).
-    const r = await fetch(`${origen()}/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/config?pageSize=20&key=${firebaseConfig.apiKey}`)
+    // La máscara trae solo los productos y la versión de las fotos, no las fotos mismas.
+    const r = await fetch(`${origen()}/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/config?pageSize=20&mask.fieldPaths=items&mask.fieldPaths=fotosVersion&key=${firebaseConfig.apiKey}`)
     if (r.ok) {
       const lista = ((await r.json()).documents || []).find((d) => d.name.endsWith('/config/menu'))
       const guardados = lista?.fields?.items ? valor(lista.fields.items) : null
       if (Array.isArray(guardados)) {
         items.value = guardados.map(normalizar)
         try { localStorage.setItem(CACHE, JSON.stringify(guardados)) } catch { /* sin almacenamiento */ }
+        await sincronizarFotos(lista.fields.fotosVersion ? Number(valor(lista.fields.fotosVersion)) : 0)
       } else {
         items.value = MENU_INICIAL.map(normalizar) // todavía no hay menú guardado: se usa el inicial
         try { localStorage.removeItem(CACHE) } catch { /* sin almacenamiento */ }
+        await sincronizarFotos(0)
       }
     }
   } catch { /* sin conexión: se queda lo último que se vio */ }
@@ -80,9 +104,12 @@ export const FOTOS_BIBLIOTECA = [
   { clave: 'calzone', nombre: 'Calzone', url: imgCalzone },
   { clave: 'base', nombre: 'Pizza de queso', url: imgBase },
 ]
-export function fotoDe(it) {
-  const f = it?.foto || ''
+// Convierte el valor guardado en un producto (o en el carrito) en una dirección de imagen usable.
+export function resolverFoto(f) {
+  if (!f) return null
   if (f.startsWith('lib:')) return FOTOS_BIBLIOTECA.find((x) => x.clave === f.slice(4))?.url || null
-  if (/^https:\/\//i.test(f)) return f
+  if (f.startsWith('sub:')) return fotosSubidas.value[f.slice(4)] || null
+  if (/^https:\/\//i.test(f) || f.startsWith('data:image/') || f.startsWith('/')) return f // dirección directa (o valores antiguos del carrito)
   return null
 }
+export const fotoDe = (it) => resolverFoto(it?.foto)

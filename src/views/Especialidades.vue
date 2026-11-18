@@ -13,7 +13,7 @@ const t = () => TAMANOS.find((x) => x.id === tamano.value)
 
 function pedir(e) {
   const tam = t()
-  const ok = agregar({ clave: `esp-${e.id}-${tam.id}`, nombre: `Pizza ${e.nombre}`, detalle: `${tam.nombre} (${tam.cm})`, precio: precioPorTamano(precioFinal(e), tam), foto: fotoDe(e) || undefined, emoji: e.emoji })
+  const ok = agregar({ clave: `esp-${e.id}-${tam.id}`, nombre: `Pizza ${e.nombre}`, detalle: `${tam.nombre} (${tam.cm})`, precio: precioPorTamano(precioFinal(e), tam), foto: e.foto || undefined, emoji: e.emoji })
   avisar(ok ? `${e.nombre} agregada` : 'El carrito está lleno')
 }
 </script>
