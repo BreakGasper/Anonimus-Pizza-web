@@ -10,13 +10,13 @@ export const precioPorTamano = (precioMediana, tamano) =>
   Math.round((precioMediana * tamano.factor) / 5) * 5
 
 export const ESPECIALIDADES = [
-  { id: 'solitaria', nombre: 'Solitaria', emoji: '🍍', precio: 175, desc: 'Pepperoni sobre queso mozzarella.' },
-  { id: 'clasica', nombre: 'Clásica', emoji: '🍕', precio: 150, desc: 'Jamón, piña, champiñones y pimiento verde.' },
-  { id: 'pepechon', nombre: 'Pepechon', emoji: '🌶️', precio: 165, desc: 'Pepperoni y champiñones.' },
-  { id: 'ambivalente', nombre: 'Ambivalente', emoji: '🧀', precio: 170, desc: 'Jamón y piña.' },
-  { id: 'carnivora', nombre: 'Carnívora', emoji: '🥩', precio: 185, desc: 'Pepperoni, jamón y salchicha.' },
-  { id: 'vegetariana', nombre: 'Vegetariana', emoji: '🥬', precio: 160, desc: 'Champiñones, cebolla, pimiento verde y aceitunas negras.' },
-  { id: 'rinconada', nombre: 'Rinconada', emoji: '🔥', precio: 180, desc: 'Salchicha italiana, chorizo, cebolla y jalapeño.' },
+  { id: 'solitaria', nombre: 'Solitaria', emoji: '🍍', precio: 175, ingredientes: ['Pepperoni'], desc: 'Pepperoni sobre queso mozzarella.' },
+  { id: 'clasica', nombre: 'Clásica', emoji: '🍕', precio: 150, ingredientes: ['Jamón', 'Piña', 'Champiñones', 'Pimiento verde'], desc: 'Jamón, piña, champiñones y pimiento verde.' },
+  { id: 'pepechon', nombre: 'Pepechon', emoji: '🌶️', precio: 165, ingredientes: ['Pepperoni', 'Champiñones'], desc: 'Pepperoni y champiñones.' },
+  { id: 'ambivalente', nombre: 'Ambivalente', emoji: '🧀', precio: 170, ingredientes: ['Jamón', 'Piña'], desc: 'Jamón y piña.' },
+  { id: 'carnivora', nombre: 'Carnívora', emoji: '🥩', precio: 185, ingredientes: ['Pepperoni', 'Jamón', 'Salchicha'], desc: 'Pepperoni, jamón y salchicha.' },
+  { id: 'vegetariana', nombre: 'Vegetariana', emoji: '🥬', precio: 160, ingredientes: ['Champiñones', 'Cebolla', 'Pimiento verde', 'Aceitunas negras'], desc: 'Champiñones, cebolla, pimiento verde y aceitunas negras.' },
+  { id: 'rinconada', nombre: 'Rinconada', emoji: '🔥', precio: 180, ingredientes: ['Salchicha italiana', 'Chorizo', 'Cebolla', 'Jalapeño'], desc: 'Salchicha italiana, chorizo, cebolla y jalapeño.' },
 ]
 
 // "Arma tu pizza": precio base de la mediana con 3 ingredientes incluidos.
