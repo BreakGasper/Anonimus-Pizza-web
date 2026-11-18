@@ -11,8 +11,8 @@ const secciones = [
   { titulo: 'Bebidas', lista: ADICIONALES.bebidas },
 ]
 
-function pedir(a) {
-  const ok = agregar({ clave: `ad-${a.id}`, nombre: a.nombre, detalle: '', precio: a.precio })
+function pedir(a, foto) {
+  const ok = agregar({ clave: `ad-${a.id}`, nombre: a.nombre, detalle: '', precio: a.precio, foto, emoji: a.emoji })
   avisar(ok ? `${a.nombre} agregado` : 'El carrito está lleno')
 }
 </script>
@@ -24,7 +24,7 @@ function pedir(a) {
   <template v-for="s in secciones" :key="s.titulo">
     <h2 style="margin:18px 0 10px">{{ s.titulo }}</h2>
     <div class="grilla">
-      <ProductoCard v-for="a in s.lista" :key="a.id" :nombre="a.nombre" :desc="a.desc" :precio="a.precio" :emoji="a.emoji" :foto="s.foto" @agregar="pedir(a)" />
+      <ProductoCard v-for="a in s.lista" :key="a.id" :nombre="a.nombre" :desc="a.desc" :precio="a.precio" :emoji="a.emoji" :foto="s.foto" @agregar="pedir(a, s.foto)" />
     </div>
   </template>
 </template>

@@ -92,8 +92,14 @@ function dibujar() {
   raf = 0
   const cv = lienzo.value
   if (!cv || !meta || !imgPizza) return
-  const ctx = cv.getContext('2d')
-  const W = cv.width, k = W / meta.pizza.lado, ahora = performance.now()
+  const { animando, pendiente } = pintar(cv.getContext('2d'), cv.width, false)
+  listo.value = !pendiente && !animando
+  if (animando) programar()
+}
+
+// Dibuja la pizza completa. Con `final` no anima ni toca el estado de la animación (sirve para la miniatura del carrito).
+function pintar(ctx, W, final) {
+  const k = W / meta.pizza.lado, ahora = performance.now()
   ctx.clearRect(0, 0, W, W)
   ctx.drawImage(imgPizza, 0, 0, W, W)
 
@@ -128,8 +134,8 @@ function dibujar() {
     for (let i = 0; i < n; i++) {
       const p = piezas[i], d = defs[p.s], clave = `${slug}:${i}`
       vigentes.add(clave)
-      if (!vistos.has(clave)) vistos.set(clave, ahora + (MOVIMIENTO_REDUCIDO ? -1000 : Math.min(nuevas++ * 22, 520)))
-      const t = MOVIMIENTO_REDUCIDO ? 1 : Math.min(1, Math.max(0, (ahora - vistos.get(clave)) / DURACION))
+      if (!final && !vistos.has(clave)) vistos.set(clave, ahora + (MOVIMIENTO_REDUCIDO ? -1000 : Math.min(nuevas++ * 22, 520)))
+      const t = (MOVIMIENTO_REDUCIDO || final) ? 1 : Math.min(1, Math.max(0, (ahora - vistos.get(clave)) / DURACION))
       if (t < 1) animando = true
       if (t <= 0) continue
       // cae (acelera), toca el queso y rebota un poquito
@@ -179,11 +185,18 @@ function dibujar() {
     ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = g; ctx.fillRect(0, 0, W, W)
     ctx.restore()
   }
-  for (const clave of vistos.keys()) if (!vigentes.has(clave)) vistos.delete(clave)
-
-  listo.value = !pendiente && !animando
-  if (animando) programar()
+  if (!final) for (const clave of vistos.keys()) if (!vigentes.has(clave)) vistos.delete(clave)
+  return { animando, pendiente }
 }
+
+// Miniatura de la pizza tal como está ahora (sin animación), para mostrarla en el carrito.
+function instantanea(lado = 220) {
+  if (!meta || !imgPizza) return null
+  const cv = document.createElement('canvas'); cv.width = cv.height = lado
+  pintar(cv.getContext('2d'), lado, true)
+  try { return cv.toDataURL('image/webp', 0.85) } catch { return null }
+}
+defineExpose({ instantanea })
 
 /* ---------- Tamaño del lienzo ---------- */
 let observador

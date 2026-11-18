@@ -34,6 +34,7 @@ function alternar(lista, valor) {
 
 /* ---------- Arrastrar ingredientes hacia la pizza ---------- */
 const zona = ref(null)
+const vista = ref(null)
 const arrastre = ref(null) // { nombre, x, y } mientras se arrastra
 const sobrePizza = ref(false)
 let gesto = null
@@ -151,6 +152,7 @@ function pedir() {
     nombre: nombre.value.trim() ? `Pizza "${nombre.value.trim().slice(0, 30)}"` : 'Pizza armada',
     detalle,
     precio: precio.value,
+    foto: vista.value?.instantanea() || undefined, // tu pizza tal como la armaste
   })
   if (!ok) return avisar('El carrito está lleno')
   avisar('Pizza agregada')
@@ -209,7 +211,7 @@ function pedir() {
     <aside class="arma-lado">
       <h3 class="titulo-lado">Así se verá tu pizza</h3>
       <div ref="zona" :class="['zona-pizza', { activa: sobrePizza, vacia: !elegidos.length }]">
-        <PizzaPreview :ingredientes="elegidos" :extras="extras" :tamano="tamano" :activa="sobrePizza" :semilla="semilla" />
+        <PizzaPreview ref="vista" :ingredientes="elegidos" :extras="extras" :tamano="tamano" :activa="sobrePizza" :semilla="semilla" />
         <p class="pie-pizza">{{ tam.nombre }} · {{ tam.cm }}</p>
         <p v-if="!elegidos.length" class="desc" style="text-align:center">Suelta aquí los ingredientes que quieras.</p>
         <div v-else class="lleva">
