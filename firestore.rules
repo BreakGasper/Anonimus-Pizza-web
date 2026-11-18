@@ -3,11 +3,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Solo el administrador (correo de Google verificado).
+    // Administrador: o bien el correo de Google verificado, o bien una cuenta de la lista /admins.
+    // La lista /admins se llena solo desde la consola de Firebase (ningún cliente puede escribirla),
+    // así no hay teléfonos, contraseñas ni identificadores de cuenta dentro del repositorio.
     function esAdmin() {
-      return request.auth != null
-        && request.auth.token.email == 'breakgasper@gmail.com'
-        && request.auth.token.email_verified == true;
+      return request.auth != null && (
+        (request.auth.token.email == 'breakgasper@gmail.com' && request.auth.token.email_verified == true)
+        || exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Cada administrador puede leer su propio registro (la app lo usa para saber si tiene permiso).
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
     }
 
     // Pedidos: cualquier visitante puede CREAR uno válido; solo el admin lee/edita/borra.
