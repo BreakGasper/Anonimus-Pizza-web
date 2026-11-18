@@ -10,13 +10,13 @@ export const precioPorTamano = (precioMediana, tamano) =>
   Math.round((precioMediana * tamano.factor) / 5) * 5
 
 export const ESPECIALIDADES = [
-  { id: 'solitaria', nombre: 'Solitaria', emoji: '🍍', precio: 175, desc: 'Jamón, salchicha, pepperoni, champiñones y piña.' },
-  { id: 'clasica', nombre: 'Clásica', emoji: '🍕', precio: 150, desc: 'Salsa de tomate, queso mozzarella y pepperoni.' },
-  { id: 'pepechon', nombre: 'Pepechon', emoji: '🌶️', precio: 165, desc: 'Doble pepperoni, chorizo y chile jalapeño.' },
-  { id: 'ambivalente', nombre: 'Ambivalente', emoji: '🧀', precio: 170, desc: 'Mitad hawaiana, mitad mexicana.' },
-  { id: 'carnivora', nombre: 'Carnívora', emoji: '🥩', precio: 185, desc: 'Jamón, tocino, salchicha, chorizo y pepperoni.' },
-  { id: 'vegetariana', nombre: 'Vegetariana', emoji: '🥬', precio: 160, desc: 'Champiñones, pimiento, cebolla, aceituna y elote.' },
-  { id: 'rinconada', nombre: 'Rinconada', emoji: '🔥', precio: 180, desc: 'Cochinita, cebolla morada y chile habanero.' },
+  { id: 'solitaria', nombre: 'Solitaria', emoji: '🍍', precio: 175, desc: 'Pepperoni sobre queso mozzarella.' },
+  { id: 'clasica', nombre: 'Clásica', emoji: '🍕', precio: 150, desc: 'Jamón, piña, champiñones y pimiento verde.' },
+  { id: 'pepechon', nombre: 'Pepechon', emoji: '🌶️', precio: 165, desc: 'Pepperoni y champiñones.' },
+  { id: 'ambivalente', nombre: 'Ambivalente', emoji: '🧀', precio: 170, desc: 'Jamón y piña.' },
+  { id: 'carnivora', nombre: 'Carnívora', emoji: '🥩', precio: 185, desc: 'Pepperoni, jamón y salchicha.' },
+  { id: 'vegetariana', nombre: 'Vegetariana', emoji: '🥬', precio: 160, desc: 'Champiñones, cebolla, pimiento verde y aceitunas negras.' },
+  { id: 'rinconada', nombre: 'Rinconada', emoji: '🔥', precio: 180, desc: 'Salchicha italiana, chorizo, cebolla y jalapeño.' },
 ]
 
 // "Arma tu pizza": precio base de la mediana con 3 ingredientes incluidos.
@@ -28,8 +28,8 @@ export const ARMA = {
     { id: 'salsa', nombre: 'Extra salsa de tomate', precio: 10 },
     { id: 'queso', nombre: 'Extra queso', precio: 20 },
   ],
-  verduras: ['Champiñones', 'Pimiento', 'Cebolla', 'Aceitunas', 'Elote', 'Piña', 'Jalapeño', 'Tomate'],
-  carnes: ['Pepperoni', 'Jamón', 'Salchicha', 'Chorizo', 'Tocino', 'Carne molida', 'Pollo'],
+  verduras: ['Champiñones', 'Pimiento verde', 'Cebolla', 'Aceitunas negras', 'Jalapeño', 'Piña'],
+  carnes: ['Pepperoni', 'Jamón', 'Salchicha', 'Salchicha italiana', 'Chorizo', 'Carne molida'],
 }
 
 export const PAQUETES = [
