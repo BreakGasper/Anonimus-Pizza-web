@@ -11,7 +11,7 @@ const fecha = (iso) => new Date(iso).toLocaleString('es-MX', { dateStyle: 'mediu
 
 <template>
   <template v-if="ultimoPedido">
-    <h1 class="titulo">¡Pedido recibido!</h1>
+    <h1 class="titulo">¡Pedido <em>recibido!</em></h1>
     <p class="sub">Gracias, {{ ultimoPedido.nombre }}. Te llevamos tu pedido en breve. Guarda este ticket.</p>
 
     <div class="ticket">

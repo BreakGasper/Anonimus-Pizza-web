@@ -130,13 +130,16 @@ const esReceta = (e) => e.ingredientes.length === elegidos.value.length && e.ing
 
 /* ---------- Barra de pedido: ¿se ve la pizza? ---------- */
 const pizzaVisible = ref(true)
-let vigia
+const esEscritorio = ref(typeof matchMedia === 'function' && matchMedia('(min-width: 960px)').matches)
+let vigia, mq
+const alCambiarMq = (e) => (esEscritorio.value = e.matches)
 onMounted(() => {
+  if (typeof matchMedia === 'function') { mq = matchMedia('(min-width: 960px)'); mq.addEventListener('change', alCambiarMq) }
   if (typeof IntersectionObserver !== 'function') return
   vigia = new IntersectionObserver(([e]) => (pizzaVisible.value = e.isIntersecting), { threshold: 0.35 })
   vigia.observe(zona.value)
 })
-onBeforeUnmount(() => vigia?.disconnect())
+onBeforeUnmount(() => { vigia?.disconnect(); mq?.removeEventListener('change', alCambiarMq) })
 onBeforeUnmount(limpiar)
 
 function pedir() {
@@ -156,70 +159,84 @@ function pedir() {
 </script>
 
 <template>
-  <h1 class="titulo">Arma tu pizza</h1>
-  <p class="sub">{{ money(ARMA.precioMediana) }} la mediana con {{ ARMA.incluidos }} ingredientes. Cada ingrediente extra suma {{ money(ARMA.precioExtraIngrediente) }}.</p>
+  <div class="arma">
+    <div class="arma-col">
+      <h1 class="titulo">Arma tu <em>pizza</em></h1>
+      <p class="sub">{{ money(ARMA.precioMediana) }} la mediana con {{ ARMA.incluidos }} ingredientes. Cada ingrediente extra suma {{ money(ARMA.precioExtraIngrediente) }}.</p>
 
-  <h3>Empieza rápido</h3>
-  <p class="desc" style="margin-bottom:6px">Toca una especialidad y ajústala a tu gusto, o deja que te sorprendamos.</p>
-  <div class="rapido">
-    <button v-for="e in ESPECIALIDADES" :key="e.id" type="button" :class="['chip esp', { on: esReceta(e) }]" :aria-pressed="esReceta(e)" @click="aplicar(e.ingredientes)">
-      <img :src="imgEspecialidad(e.id)" alt="" width="30" height="30" />{{ e.nombre }}
-    </button>
-    <button type="button" class="chip sorpresa" @click="sorprender">🎲 Sorpréndeme</button>
-  </div>
+      <section class="bloque">
+        <h3>Empieza rápido</h3>
+        <p class="desc" style="margin-bottom:8px">Toca una especialidad y ajústala a tu gusto, o deja que te sorprendamos.</p>
+        <div class="rapido">
+          <button v-for="e in ESPECIALIDADES" :key="e.id" type="button" :class="['chip esp', { on: esReceta(e) }]" :aria-pressed="esReceta(e)" @click="aplicar(e.ingredientes)">
+            <img :src="imgEspecialidad(e.id)" alt="" width="30" height="30" />{{ e.nombre }}
+          </button>
+          <button type="button" class="chip sorpresa" @click="sorprender">🎲 Sorpréndeme</button>
+        </div>
+      </section>
 
-  <h3 style="margin-top:18px">Tamaño</h3>
-  <Tamanos v-model="tamano" />
+      <section class="bloque">
+        <h3>Tamaño</h3>
+        <Tamanos v-model="tamano" />
+      </section>
 
-  <h3 style="margin-top:18px">Ingredientes</h3>
-  <p class="desc" style="margin-bottom:6px">Tócalos o <b>arrástralos</b> a la pizza<span class="solo-tactil"> (mantén presionado y arrastra)</span>.</p>
+      <section class="bloque">
+        <h3>Ingredientes</h3>
+        <p class="desc" style="margin-bottom:8px">Tócalos o <b>arrástralos</b> a la pizza<span class="solo-tactil"> (mantén presionado y arrastra)</span>.</p>
+        <div class="paleta" aria-label="Verduras">
+          <button v-for="v in ARMA.verduras" :key="v" type="button" :class="['chip ing', { on: elegidos.includes(v) }]"
+            :aria-pressed="elegidos.includes(v)" @pointerdown="empezar($event, v)" @click="clic(v)" @contextmenu.prevent>
+            <img :src="imgIcono(v)" alt="" class="ico" width="26" height="26" draggable="false" />{{ v }}
+          </button>
+        </div>
+        <div class="paleta" aria-label="Carnes">
+          <button v-for="c in ARMA.carnes" :key="c" type="button" :class="['chip ing', { on: elegidos.includes(c) }]"
+            :aria-pressed="elegidos.includes(c)" @pointerdown="empezar($event, c)" @click="clic(c)" @contextmenu.prevent>
+            <img :src="imgIcono(c)" alt="" class="ico" width="26" height="26" draggable="false" />{{ c }}
+          </button>
+        </div>
+      </section>
 
-  <div class="paleta" aria-label="Verduras">
-    <button v-for="v in ARMA.verduras" :key="v" type="button" :class="['chip ing', { on: elegidos.includes(v) }]"
-      :aria-pressed="elegidos.includes(v)" @pointerdown="empezar($event, v)" @click="clic(v)" @contextmenu.prevent>
-      <img :src="imgIcono(v)" alt="" class="ico" width="26" height="26" draggable="false" />{{ v }}
-    </button>
-  </div>
-  <div class="paleta" aria-label="Carnes">
-    <button v-for="c in ARMA.carnes" :key="c" type="button" :class="['chip ing', { on: elegidos.includes(c) }]"
-      :aria-pressed="elegidos.includes(c)" @pointerdown="empezar($event, c)" @click="clic(c)" @contextmenu.prevent>
-      <img :src="imgIcono(c)" alt="" class="ico" width="26" height="26" draggable="false" />{{ c }}
-    </button>
-  </div>
-
-  <h3>Extras</h3>
-  <div class="chips">
-    <button v-for="e in ARMA.extras" :key="e.id" type="button" :class="['chip', { on: extras.includes(e.id) }]"
-      :aria-pressed="extras.includes(e.id)" @click="alternar(extras, e.id)">{{ e.nombre }} (+{{ money(e.precio) }})</button>
-  </div>
-
-  <h3>Así se verá tu pizza</h3>
-  <div ref="zona" :class="['zona-pizza', { activa: sobrePizza, vacia: !elegidos.length }]">
-    <PizzaPreview :ingredientes="elegidos" :extras="extras" :tamano="tamano" :activa="sobrePizza" :semilla="semilla" />
-    <p class="pie-pizza">{{ tam.nombre }} · {{ tam.cm }}</p>
-    <p v-if="!elegidos.length" class="desc" style="text-align:center">Suelta aquí los ingredientes que quieras.</p>
-    <div v-else class="lleva">
-      <button v-for="ing in elegidos" :key="ing" type="button" class="quitar-ing" :aria-label="'Quitar ' + ing" @click="quitar(ing)">{{ ing }} ✕</button>
+      <section class="bloque">
+        <h3>Extras</h3>
+        <div class="chips">
+          <button v-for="e in ARMA.extras" :key="e.id" type="button" :class="['chip', { on: extras.includes(e.id) }]"
+            :aria-pressed="extras.includes(e.id)" @click="alternar(extras, e.id)">{{ e.nombre }} (+{{ money(e.precio) }})</button>
+        </div>
+      </section>
     </div>
-  </div>
 
-  <label class="campo">¡Ponle un nombre! (opcional)
-    <input v-model="nombre" maxlength="30" placeholder="Ej. La del jefe" />
-  </label>
-
-  <div class="tarjeta">
-    <div class="fila">
-      <div class="grow">
-        <b>Tu pizza</b>
-        <p class="desc">{{ elegidos.length ? elegidos.length + ' ingrediente(s)' : 'Elige al menos un ingrediente' }}</p>
-        <p v-if="sobrantes" class="desc">{{ sobrantes }} extra(s): +{{ money(sobrantes * ARMA.precioExtraIngrediente) }}</p>
+    <aside class="arma-lado">
+      <h3 class="titulo-lado">Así se verá tu pizza</h3>
+      <div ref="zona" :class="['zona-pizza', { activa: sobrePizza, vacia: !elegidos.length }]">
+        <PizzaPreview :ingredientes="elegidos" :extras="extras" :tamano="tamano" :activa="sobrePizza" :semilla="semilla" />
+        <p class="pie-pizza">{{ tam.nombre }} · {{ tam.cm }}</p>
+        <p v-if="!elegidos.length" class="desc" style="text-align:center">Suelta aquí los ingredientes que quieras.</p>
+        <div v-else class="lleva">
+          <button v-for="ing in elegidos" :key="ing" type="button" class="quitar-ing" :aria-label="'Quitar ' + ing" @click="quitar(ing)">{{ ing }} ✕</button>
+        </div>
       </div>
-      <div class="precio" style="font-size:1.3rem">{{ money(precio) }}</div>
-    </div>
-  </div>
-  <div v-if="elegidos.length" class="relleno-barra"></div>
 
-  <div v-if="elegidos.length" class="barra-pedir" role="region" aria-label="Tu pizza">
+      <label class="campo">¡Ponle un nombre! (opcional)
+        <input v-model="nombre" maxlength="30" placeholder="Ej. La del jefe" />
+      </label>
+
+      <div class="tarjeta">
+        <div class="fila">
+          <div class="grow">
+            <b>Tu pizza</b>
+            <p class="desc">{{ elegidos.length ? elegidos.length + ' ingrediente(s)' : 'Elige al menos un ingrediente' }}</p>
+            <p v-if="sobrantes" class="desc">{{ sobrantes }} extra(s): +{{ money(sobrantes * ARMA.precioExtraIngrediente) }}</p>
+          </div>
+          <div class="precio">{{ money(precio) }}</div>
+        </div>
+      </div>
+      <button v-if="esEscritorio" class="btn block" :disabled="!elegidos.length" @click="pedir">Agregar al carrito</button>
+    </aside>
+  </div>
+
+  <div v-if="!esEscritorio && elegidos.length" class="relleno-barra"></div>
+  <div v-if="!esEscritorio && elegidos.length" class="barra-pedir" role="region" aria-label="Tu pizza">
     <div class="barra-in">
       <button v-if="!pizzaVisible" type="button" class="btn claro chico" @click="irAPizza">Ver pizza ↓</button>
       <div class="grow"><b>{{ money(precio) }}</b></div>
@@ -234,28 +251,39 @@ function pedir() {
 </template>
 
 <style>
-.paleta { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
-.chip.ing { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.arma { display: block; }
+.bloque { margin-bottom: 20px; }
+.bloque h3 { margin-bottom: 8px; }
+.titulo-lado { margin: 8px 0 10px; }
+.paleta { margin: 0 0 10px; }
+.chip.ing { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px 5px 8px; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .chip.ing .ico { width: 26px; height: 26px; object-fit: contain; flex: none; pointer-events: none; }
-.zona-pizza { background: linear-gradient(rgba(25,10,3,.18), rgba(25,10,3,.5)), url('/img/mesa.webp') center / cover; border: 2px solid #4a2110;
-  border-radius: 18px; padding: 26px 12px 12px; margin-bottom: 14px; box-shadow: inset 0 0 40px #0008; transition: border-color .15s, box-shadow .15s; }
+.chip.esp { display: inline-flex; align-items: center; gap: 6px; padding: 4px 14px 4px 5px; }
+.chip.esp img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+.chip.sorpresa { background: linear-gradient(135deg, #ff9800, #ff5722); border-color: #ff7a1a; color: #fff; font-weight: 700; }
+.zona-pizza { background: linear-gradient(rgba(25,10,3,.2), rgba(25,10,3,.55)), url('/img/mesa.webp') center / cover; border: 2px solid #4a2110;
+  border-radius: 20px; padding: 26px 12px 12px; margin-bottom: 14px; box-shadow: inset 0 0 40px #0008; transition: border-color .15s, box-shadow .15s; }
 .zona-pizza.activa { border-color: #ff9800; box-shadow: inset 0 0 40px #0008, 0 0 0 3px #ff980066; }
 .zona-pizza .desc { color: #f3dfc7; }
 .pie-pizza { text-align: center; color: #f3dfc7; text-shadow: 0 1px 3px #000a; font-size: .85rem; margin: 6px 0 4px; }
 .lleva { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
-.quitar-ing { border: 1px solid var(--linea); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: .8rem; }
+.quitar-ing { border: 1px solid #ffffff55; background: #00000055; color: #fff; border-radius: 999px; padding: 6px 12px; font-size: .82rem; }
 .fantasma { position: fixed; z-index: 50; transform: translate(-50%, -135%); pointer-events: none; display: flex; align-items: center; gap: 6px;
-  background: #fff; border: 2px solid #ff9800; border-radius: 999px; padding: 4px 12px 4px 6px; box-shadow: 0 6px 18px #0004; font-weight: 600; font-size: .9rem; }
-.rapido { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
-.chip.esp { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 4px; }
-.chip.esp img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
-.chip.sorpresa { background: linear-gradient(135deg, #ff9800, #ff5722); border-color: #ff7a1a; color: #fff; font-weight: 600; }
-.relleno-barra { height: 64px; }
-.barra-pedir { position: fixed; left: 0; right: 0; bottom: calc(58px + env(safe-area-inset-bottom, 0px)); z-index: 9; background: rgba(255, 247, 234, .96);
-  backdrop-filter: blur(6px); border-top: 1px solid var(--linea); padding: 8px 16px; box-shadow: 0 -4px 14px #0002; }
+  background: #fff3e6; color: #2b1d14; border: 2px solid #ff9800; border-radius: 999px; padding: 4px 12px 4px 6px; box-shadow: 0 6px 18px #0006; font-weight: 700; font-size: .9rem; }
+.relleno-barra { height: 70px; }
+.barra-pedir { position: fixed; left: 0; right: 0; bottom: calc(var(--nav-h) + var(--seguro-abajo)); z-index: 25; background: rgba(28, 15, 10, .96); backdrop-filter: blur(10px);
+  border-top: 1px solid var(--borde); padding: 10px 16px; box-shadow: 0 -6px 18px #0006; }
 .barra-in { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; align-items: center; }
 .barra-in .btn { white-space: nowrap; }
-.barra-in .grow b { font: 700 1.3rem var(--display); color: var(--verde); }
+.barra-in .grow b { font: 800 1.5rem var(--display); color: var(--ambar); }
 .solo-tactil { display: none; }
 @media (pointer: coarse) { .solo-tactil { display: inline; } }
+@media (min-width: 960px) {
+  .arma { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 36px; align-items: start; }
+  .arma-lado { position: sticky; top: calc(var(--cab-h) + 16px); max-height: calc(100dvh - var(--cab-h) - 32px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; padding-right: 4px; }
+  .zona-pizza { padding: 18px 12px 10px; margin-bottom: 10px; }
+  .zona-pizza .pizza-caja { max-width: 255px; }
+  .arma-lado .tarjeta { margin-bottom: 10px; padding: 12px 14px; }
+  .arma-lado .campo { margin-bottom: 8px; }
+}
 </style>

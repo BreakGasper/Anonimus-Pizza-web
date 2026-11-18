@@ -42,14 +42,15 @@ async function confirmar() {
 </script>
 
 <template>
-  <h1 class="titulo">Tu pedido</h1>
+  <h1 class="titulo">Tu <em>pedido</em></h1>
 
   <div v-if="!items.length" class="tarjeta" style="text-align:center">
     <p>Aún no agregas nada.</p>
     <router-link to="/especialidades" class="btn">Ver el menú</router-link>
   </div>
 
-  <template v-else>
+  <div v-else class="carrito-grid">
+   <section>
     <article v-for="i in items" :key="i.clave" class="tarjeta">
       <div class="fila">
         <div class="grow">
@@ -67,8 +68,10 @@ async function confirmar() {
     </article>
 
     <div class="total"><span>Total</span><span>{{ money(total) }}</span></div>
+   </section>
 
-    <h2 style="margin:16px 0 8px">¿Dónde la llevamos?</h2>
+   <section>
+    <h2 style="margin:0 0 10px">¿Dónde la llevamos?</h2>
     <form @submit.prevent="confirmar" novalidate>
       <label class="campo">Nombre
         <input v-model="f.nombre" maxlength="80" autocomplete="name" />
@@ -92,5 +95,6 @@ async function confirmar() {
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <button class="btn block" :disabled="enviando">{{ enviando ? 'Enviando…' : 'Confirmar pedido · ' + money(total) }}</button>
     </form>
-  </template>
+   </section>
+  </div>
 </template>
