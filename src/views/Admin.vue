@@ -1,13 +1,14 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth'
-import { collection, query, orderBy, limit, onSnapshot, updateDoc, doc, serverTimestamp, deleteField } from 'firebase/firestore'
+import { collection, query, orderBy, where, limit, onSnapshot, updateDoc, getDoc, getDocs, doc, serverTimestamp, deleteField } from 'firebase/firestore'
 import { authAdmin as auth, dbAdmin as db } from '../firebase/admin.js'
 import { correoDeTelefono } from '../firebase/claves.js'
 import { money } from '../data/menu.js'
 import Logo from '../components/Logo.vue'
 import Icono from '../components/Icono.vue'
 import AdminMenu from '../components/AdminMenu.vue'
+import AdminUsuarios from '../components/AdminUsuarios.vue'
 
 /* ---------- Sesión ---------- */
 const usuario = ref(null)
@@ -51,9 +52,33 @@ const ESTADOS = ['nuevo', 'preparando', 'en_camino', 'entregado', 'cancelado']
 const SIGUIENTE = { nuevo: 'preparando', preparando: 'en_camino', en_camino: 'entregado' }
 const ETIQUETA = { nuevo: 'Nuevo', preparando: 'Preparando', en_camino: 'En camino', entregado: 'Entregado', cancelado: 'Cancelado' }
 
+/* ---------- Perfil (rol) de quien entra: admin, tienda o empleado ---------- */
+const rol = ref(null)
+const esAdminRol = computed(() => rol.value === 'admin')
+const esEmpleadoRol = computed(() => rol.value === 'empleado')
+const puedeGestionar = computed(() => rol.value === 'admin' || rol.value === 'tienda') // cancelar, reabrir y menú
+const ROL_ETIQUETA = { admin: 'Administrador', tienda: 'Tienda', empleado: 'Empleado' }
+const PENDIENTES = ['nuevo', 'preparando', 'en_camino']
+
+async function detectarRol(u) {
+  try {
+    const s = await getDoc(doc(db, 'admins', u.uid))
+    if (s.exists()) {
+      const d = s.data()
+      if (d.activo === false) return 'inactivo'
+      return ['admin', 'tienda', 'empleado'].includes(d.rol) ? d.rol : 'admin' // un perfil sin rol (creado a mano) es admin
+    }
+  } catch { /* se intenta la comprobación de abajo */ }
+  // Sin perfil: solo puede ser el admin de Google (autorizado por su correo en las reglas). Se comprueba con una lectura de prueba.
+  try { await getDocs(query(collection(db, 'pedidos'), limit(1))); return 'admin' } catch { return null }
+}
+
 function escuchar() {
   cortar?.(); errorDatos.value = ''; primera = true
-  const q = query(collection(db, 'pedidos'), orderBy('creado', 'desc'), limit(500))
+  // El empleado solo puede leer los pedidos por atender (lo exigen las reglas); admin y tienda leen todos.
+  const q = rol.value === 'empleado'
+    ? query(collection(db, 'pedidos'), where('estado', 'in', PENDIENTES), limit(300))
+    : query(collection(db, 'pedidos'), orderBy('creado', 'desc'), limit(500))
   cortar = onSnapshot(q, (s) => {
     pedidos.value = s.docs.map((d) => ({ id: d.id, ...d.data() }))
     if (!primera) s.docChanges().forEach((c) => { if (c.type === 'added') alertaNuevo(c.doc.data()) })
@@ -64,9 +89,15 @@ function escuchar() {
   })
 }
 onMounted(() => {
-  onAuthStateChanged(auth, (u) => {
-    usuario.value = u; cargando.value = false
-    if (u) escuchar(); else { cortar?.(); pedidos.value = []; errorDatos.value = '' }
+  onAuthStateChanged(auth, async (u) => {
+    usuario.value = u; cortar?.(); pedidos.value = []; errorDatos.value = ''; rol.value = null
+    if (!u) { cargando.value = false; return }
+    cargando.value = true
+    const r = await detectarRol(u)
+    cargando.value = false
+    if (!r || r === 'inactivo') { errorDatos.value = r === 'inactivo' ? 'inactivo' : 'sinpermiso'; return }
+    rol.value = r; pestana.value = 'pedidos'; estado.value = 'activos'
+    escuchar()
   })
 })
 onUnmounted(() => { cortar?.(); document.title = tituloOriginal })
@@ -109,21 +140,27 @@ const enPeriodo = (p) => {
   if (periodo.value === '7') return f >= inicioDia(new Date(Date.now() - 6 * 864e5))
   return true
 }
-const delPeriodo = computed(() => pedidos.value.filter(enPeriodo))
+const esPend = (p) => PENDIENTES.includes(p.estado)
+// Los pedidos por atender se ven siempre (de cualquier día); el periodo solo filtra los ya atendidos (entregados y cancelados).
+const delPeriodo = computed(() => pedidos.value.filter((p) => esPend(p) || enPeriodo(p)))
 const conteo = computed(() => {
   const c = { activos: 0, todos: delPeriodo.value.length }
   ESTADOS.forEach((e) => (c[e] = 0))
-  delPeriodo.value.forEach((p) => { c[p.estado] = (c[p.estado] || 0) + 1; if (['nuevo', 'preparando', 'en_camino'].includes(p.estado)) c.activos++ })
+  delPeriodo.value.forEach((p) => { c[p.estado] = (c[p.estado] || 0) + 1; if (esPend(p)) c.activos++ })
   return c
 })
+// Orden para TODOS los perfiles: primero lo que falta por atender, del más viejo al más nuevo; después lo ya atendido, del más reciente al más antiguo.
+const marca = (p) => (fechaDe(p) ? fechaDe(p).getTime() : Date.now())
+const ordenar = (l) => [...l.filter(esPend).sort((a, b) => marca(a) - marca(b)), ...l.filter((p) => !esPend(p)).sort((a, b) => marca(b) - marca(a))]
 const visibles = computed(() => {
   const q = busqueda.value.trim().toLowerCase()
-  return delPeriodo.value.filter((p) => {
-    if (estado.value === 'activos' && !['nuevo', 'preparando', 'en_camino'].includes(p.estado)) return false
+  const lista = delPeriodo.value.filter((p) => {
+    if (estado.value === 'activos' && !esPend(p)) return false
     if (!['activos', 'todos'].includes(estado.value) && p.estado !== estado.value) return false
     if (!q) return true
     return `${p.nombre} ${p.telefono} ${p.direccion} ${p.id.slice(0, 6)}`.toLowerCase().includes(q)
   })
+  return ordenar(lista)
 })
 const nuevos = computed(() => pedidos.value.filter((p) => p.estado === 'nuevo').length)
 watch(nuevos, (n) => { document.title = n ? `(${n}) Pedidos nuevos · Anonimus` : tituloOriginal }, { immediate: true })
@@ -188,7 +225,8 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
     <header class="adm-cab">
       <div class="adm-marca"><span class="adm-logo"><Logo /></span><div><b>Panel de administración</b><small>Anonimus Pizza</small></div></div>
       <div v-if="usuario" class="adm-usuario">
-        <span class="adm-correo" title="Cuenta de administrador conectada">👤 {{ usuario.email }}</span>
+        <span class="adm-correo" title="Cuenta conectada">👤 {{ usuario.email }}</span>
+        <span v-if="rol" :class="['rol-insignia', rol]">{{ ROL_ETIQUETA[rol] }}</span>
         <label class="interruptor" title="Aviso sonoro de pedidos nuevos"><input type="checkbox" v-model="sonido" @change="guardarSonido" /><span>🔔 Sonido</span></label>
         <button class="btn chico claro" @click="signOut(auth)">Salir</button>
       </div>
@@ -217,7 +255,12 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 
     <!-- Panel -->
     <template v-else>
-      <div v-if="errorDatos === 'sinpermiso'" class="tarjeta sin-permiso" role="alert">
+      <div v-if="errorDatos === 'inactivo'" class="tarjeta sin-permiso" role="alert">
+        <h2>Perfil desactivado</h2>
+        <p>Tu perfil está desactivado. Pide a un administrador que lo vuelva a activar.</p>
+        <button class="btn" @click="signOut(auth)">Salir</button>
+      </div>
+      <div v-else-if="errorDatos === 'sinpermiso'" class="tarjeta sin-permiso" role="alert">
         <h2>Sin permiso</h2>
         <p>Esta cuenta no es de administrador, por eso no puede ver los pedidos.</p>
         <button class="btn" @click="signOut(auth)">Salir y probar con otra cuenta</button>
@@ -226,25 +269,27 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
         <p v-if="errorDatos" class="error" role="alert">{{ errorDatos }}</p>
         <div v-if="aviso" class="adm-aviso" role="status">{{ aviso }}</div>
 
-        <nav class="adm-tabs" aria-label="Secciones">
+        <nav v-if="!esEmpleadoRol" class="adm-tabs" aria-label="Secciones">
           <button :class="{ on: pestana === 'pedidos' }" @click="pestana = 'pedidos'">Pedidos <b v-if="nuevos" class="punto">{{ nuevos }}</b></button>
-          <button :class="{ on: pestana === 'resumen' }" @click="pestana = 'resumen'">Resumen</button>
-          <button :class="{ on: pestana === 'menu' }" @click="pestana = 'menu'">Menú</button>
+          <button v-if="esAdminRol" :class="{ on: pestana === 'resumen' }" @click="pestana = 'resumen'">Resumen</button>
+          <button v-if="puedeGestionar" :class="{ on: pestana === 'menu' }" @click="pestana = 'menu'">Menú</button>
+          <button v-if="esAdminRol" :class="{ on: pestana === 'usuarios' }" @click="pestana = 'usuarios'">Usuarios</button>
         </nav>
+        <h2 v-else style="margin:0 0 12px">Pedidos por atender <small class="desc">· del más viejo al más nuevo</small></h2>
 
         <!-- Pedidos -->
         <section v-if="pestana === 'pedidos'">
           <div class="adm-filtros">
             <input v-model="busqueda" class="buscar" type="search" placeholder="Buscar por nombre, teléfono o folio" aria-label="Buscar pedidos" />
-            <select v-model="periodo" aria-label="Periodo">
+            <select v-if="!esEmpleadoRol" v-model="periodo" aria-label="Periodo">
               <option value="hoy">Hoy</option><option value="7">Últimos 7 días</option><option value="todo">Todos</option>
             </select>
           </div>
-          <div class="adm-estados" role="tablist">
+          <div v-if="!esEmpleadoRol" class="adm-estados" role="tablist">
             <button v-for="e in [['activos', 'Activos'], ['todos', 'Todos'], ...ESTADOS.map((x) => [x, ETIQUETA[x]])]" :key="e[0]" :class="['chip', { on: estado === e[0] }]" @click="estado = e[0]">{{ e[1] }} <b>{{ conteo[e[0]] }}</b></button>
           </div>
 
-          <p v-if="!visibles.length && !errorDatos" class="sub">No hay pedidos con estos filtros.</p>
+          <p v-if="!visibles.length && !errorDatos" class="sub">{{ esEmpleadoRol ? 'No hay pedidos por atender. ¡Todo al día!' : 'No hay pedidos con estos filtros.' }}</p>
           <div class="adm-lista">
             <article v-for="p in visibles" :key="p.id" :class="['tarjeta', 'pedido', p.estado]">
               <div class="fila" style="align-items:flex-start">
@@ -263,15 +308,15 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
               <p v-if="p.estado === 'cancelado'" class="desc" style="margin:8px 0 0">Cancelado<template v-if="horaCancelado(p)"> el {{ horaCancelado(p) }}</template>. No cuenta en las ventas.</p>
               <div class="acciones">
                 <button v-if="SIGUIENTE[p.estado]" class="btn chico verde" @click="cambiarEstado(p, SIGUIENTE[p.estado])">Pasar a: {{ ETIQUETA[SIGUIENTE[p.estado]] }}</button>
-                <button v-if="p.estado !== 'cancelado'" class="btn chico cancelar-btn" @click="cancelar(p)">✕ Cancelar pedido</button>
-                <button v-if="p.estado === 'cancelado'" class="btn chico claro" @click="reabrir(p)">Reabrir</button>
+                <button v-if="puedeGestionar && p.estado !== 'cancelado'" class="btn chico cancelar-btn" @click="cancelar(p)">✕ Cancelar pedido</button>
+                <button v-if="puedeGestionar && p.estado === 'cancelado'" class="btn chico claro" @click="reabrir(p)">Reabrir</button>
               </div>
             </article>
           </div>
         </section>
 
         <!-- Resumen -->
-        <section v-else-if="pestana === 'resumen'">
+        <section v-else-if="pestana === 'resumen' && esAdminRol">
           <div class="adm-filtros">
             <select v-model="periodoResumen" aria-label="Periodo del resumen">
               <option value="hoy">Hoy</option><option value="7">Últimos 7 días</option><option value="30">Últimos 30 días</option><option value="todo">Todos los pedidos</option>
@@ -306,7 +351,10 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
         </section>
 
         <!-- Menú de la tienda -->
-        <AdminMenu v-else />
+        <AdminMenu v-else-if="pestana === 'menu' && puedeGestionar" :puede-restablecer="esAdminRol" />
+
+        <!-- Usuarios (solo admin) -->
+        <AdminUsuarios v-else-if="pestana === 'usuarios' && esAdminRol" :uid-actual="usuario.uid" />
       </template>
     </template>
   </div>
@@ -330,8 +378,8 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 .o { text-align: center; color: var(--suave); margin: 12px 0; }
 .sin-permiso { max-width: 460px; margin: 30px auto; text-align: center; }
 .adm-aviso { position: sticky; top: 8px; z-index: 5; background: var(--verde); color: #fff; font-weight: 700; padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 6px 18px #0007; }
-.adm-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
-.adm-tabs button { padding: 10px 20px; border-radius: 999px; background: var(--sup); border: 1px solid var(--borde); color: var(--suave); font-weight: 700; }
+.adm-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.adm-tabs button { padding: 10px 18px; border-radius: 999px; background: var(--sup); border: 1px solid var(--borde); color: var(--suave); font-weight: 700; }
 .adm-tabs button.on { background: var(--rojo); border-color: var(--rojo); color: #fff; }
 .punto { background: #fff; color: var(--rojo2); border-radius: 999px; padding: 0 7px; margin-left: 4px; font-size: .8rem; }
 .adm-filtros { display: flex; gap: 10px; margin-bottom: 10px; }
@@ -341,12 +389,14 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 .adm-estados::-webkit-scrollbar { display: none; }
 .adm-estados .chip { flex: none; font-size: .88rem; padding: 7px 12px; }
 .adm-estados .chip b { margin-left: 4px; opacity: .85; }
-.adm-lista { display: grid; gap: 12px; }
+.adm-lista { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .pedido { margin: 0; border-left: 5px solid var(--borde); }
 .pedido.nuevo { border-left-color: var(--rojo); } .pedido.preparando { border-left-color: #e0a100; } .pedido.en_camino { border-left-color: #3b82f6; } .pedido.entregado { border-left-color: var(--verde); } .pedido.cancelado { opacity: .65; }
 .contacto { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 6px; }
 .enlace { color: #ffd48a; font-weight: 600; word-break: break-word; }
 .lineas { margin: 6px 0 0; padding-left: 20px; }
+.rol-insignia { font-size: .75rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--sup2); border: 1px solid var(--borde); }
+.rol-insignia.admin { background: #4a1d17; border-color: #8a3128; color: #ffb3aa; } .rol-insignia.tienda { background: #14391f; border-color: #1f6b3b; color: #b9efcd; } .rol-insignia.empleado { background: #1b2f55; border-color: #2c4f93; color: #bcd3ff; }
 .cancelar-btn { background: #e8392b1f; border: 1.5px solid #e8392b; color: #ff6a5c; box-shadow: none; }
 .resumen-grande { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .resumen .cancelados b { color: #ff6a5c; }
@@ -360,5 +410,5 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 .barra i { display: block; width: 100%; max-width: 44px; border-radius: 8px 8px 0 0; background: linear-gradient(var(--ambar), #d98a00); }
 .barra .v { font-size: .68rem; color: var(--suave); white-space: nowrap; } .barra .n { font-size: .78rem; text-transform: capitalize; }
 .top { margin: 10px 0; } .riel { height: 8px; border-radius: 4px; background: var(--sup2); margin-top: 4px; } .riel i { display: block; height: 100%; border-radius: 4px; background: var(--verde); }
-@media (min-width: 900px) { .adm-lista { grid-template-columns: 1fr 1fr; } .adm-dos { grid-template-columns: 1.3fr 1fr; } }
+@media (min-width: 900px) { .adm-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } .adm-dos { grid-template-columns: 1.3fr 1fr; } }
 </style>

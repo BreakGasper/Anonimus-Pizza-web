@@ -1,18 +1,25 @@
 # Anonimus-Pizza-web
 App Web para hacer pedidos de pizzas a domicilio personalizadas,  con entregas  y gestion de del dia
 
-## Panel de administración (`/admin`)
+## Panel de administración (`/admin`) y perfiles del personal
 
-Acceso con **teléfono + contraseña** (Firebase Authentication) o con Google. Ni el teléfono ni la contraseña están en el código.
+Entra el personal con **teléfono + contraseña** (Firebase Authentication) o, el administrador original, con Google. Ni el teléfono ni la contraseña están en el código. Hay tres perfiles, y **las reglas de Firestore los hacen cumplir** (no solo la pantalla):
 
-Para crear un administrador (una sola vez, desde la consola de Firebase):
+| | Admin | Tienda | Empleado |
+|---|---|---|---|
+| Ver pedidos | todos | todos | solo los **por atender** |
+| Avanzar el estado (preparando → en camino → entregado) | sí | sí | sí (un paso a la vez) |
+| Cancelar / reabrir pedidos | sí | sí | no |
+| Menú: productos, promociones, favoritas, **fotos** | sí | sí | no |
+| Restablecer el menú inicial | sí | no | no |
+| Resumen de ventas | sí | no | no |
+| **Registrar usuarios**, cambiar perfiles, activar/desactivar | sí | no | no |
 
-1. **Authentication → Método de acceso:** activar **Correo electrónico/contraseña**.
-2. **Authentication → Usuarios → Agregar usuario:** correo `TELEFONO@admin.anonimus.pizza` (el teléfono de 10 dígitos) y la contraseña elegida. Copiar el **UID** del usuario.
-3. **Firestore Database → Iniciar colección:** `admins`, ID del documento = ese UID, con un campo `nombre` (texto).
-4. Entrar en `/admin` con el teléfono y la contraseña.
-
-Las reglas (`firestore.rules`) solo dejan leer, editar o borrar pedidos a quien esté en `admins` (o al correo de Google autorizado). Nadie puede agregarse a `admins` desde la página.
+- **Orden en todos los perfiles:** los pedidos por atender (nuevo, preparando, en camino) siempre salen **del más viejo al más nuevo**, de cualquier día; después los ya atendidos, del más reciente al más antiguo.
+- **Primer administrador (una sola vez, en la consola de Firebase):** 1) *Authentication → Método de acceso:* activar *Correo electrónico/contraseña*. 2) *Authentication → Usuarios → Agregar usuario:* correo `TELEFONO@admin.anonimus.pizza` y la contraseña; copiar el **UID**. 3) *Firestore → colección `admins`:* documento con ese UID y un campo `nombre` (un perfil sin campo `rol` cuenta como admin).
+- **Los demás usuarios** los registra un admin desde **Usuarios** en el panel (nombre, teléfono, contraseña y perfil). Se pueden **desactivar/activar** y cambiar de perfil (no se borran, para conservar el historial; no se puede desactivar la propia cuenta ni al último admin). Para cambiar la contraseña de alguien: borrarlo en Authentication y registrarlo de nuevo.
+- Los perfiles viven en `admins/{uid}` con `nombre`, `telefono`, `rol` (`admin`, `tienda` o `empleado`) y `activo`. Un perfil desactivado no tiene ningún acceso.
+- El panel usa su propia sesión de Firebase, separada de la de los clientes.
 
 Pruebas de las reglas: `npm run test:rules` (necesita Java).
 

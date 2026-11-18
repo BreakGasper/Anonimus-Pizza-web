@@ -6,6 +6,7 @@ import { MENU_INICIAL, ARMA, money, TITULOS_CATEGORIA } from '../data/menu.js'
 import { normalizar, FOTOS_BIBLIOTECA, fotoDe, hayPromo, precioFinal, fotosSubidas } from '../store/menu.js'
 import { prepararFoto, ErrorFoto } from '../utils/imagen.js'
 
+const props = defineProps({ puedeRestablecer: { type: Boolean, default: true } })
 const items = ref([])
 const guardado = ref(false) // ¿ya existe el menú en Firestore? (si no, se muestra el inicial)
 const cargando = ref(true)
@@ -258,7 +259,7 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
           </div>
         </article>
       </div>
-      <p style="margin-top:18px"><button class="enlace-btn" @click="restablecer">Restablecer el menú inicial</button></p>
+      <p v-if="puedeRestablecer" style="margin-top:18px"><button class="enlace-btn" @click="restablecer">Restablecer el menú inicial</button></p>
     </template>
 
     <!-- Editor -->
@@ -351,7 +352,8 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
 
 <style>
 .am-cab { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.am-lista { display: grid; gap: 12px; }
+.am-lista { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.am-item { min-width: 0; } .am-item .grow { min-width: 0; } .am-nombre { overflow-wrap: anywhere; }
 .am-item { margin: 0; } .am-item.oculto { opacity: .6; }
 .am-foto { width: 64px; height: 64px; flex: none; border-radius: 50%; background: var(--sup2); display: grid; place-items: center; overflow: hidden; font-size: 2rem; }
 .am-foto img { width: 100%; height: 100%; object-fit: cover; }
@@ -384,6 +386,6 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
 .modal select { width: 100%; margin-top: 5px; padding: 13px 14px; border: 1.5px solid var(--borde); border-radius: 12px; background: var(--sup); color: var(--texto); font-family: inherit; }
 @media (min-width: 720px) {
   .modal { align-items: center; padding: 20px; } .modal-caja { border-radius: 22px; }
-  .dos { grid-template-columns: 1fr 1fr; } .am-lista { grid-template-columns: 1fr 1fr; }
+  .dos { grid-template-columns: 1fr 1fr; } .am-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>
