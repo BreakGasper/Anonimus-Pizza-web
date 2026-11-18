@@ -1,8 +1,10 @@
 <script setup>
 import { money } from '../data/menu.js'
+import Icono from './Icono.vue'
+import { iconoProducto } from '../utils/iconos.js'
 defineProps({
   nombre: { type: String, required: true }, desc: String, precio: { type: Number, required: true }, precioOriginal: Number,
-  foto: String, emoji: String, desde: Boolean, etiqueta: String,
+  foto: String, icono: String, desde: Boolean, etiqueta: String,
 })
 defineEmits(['agregar'])
 </script>
@@ -11,7 +13,7 @@ defineEmits(['agregar'])
   <article class="prod">
     <div class="prod-foto">
       <img v-if="foto" :src="foto" :alt="nombre" loading="lazy" decoding="async" />
-      <span v-else class="prod-emoji" aria-hidden="true">{{ emoji || '🍕' }}</span>
+      <span v-else class="prod-emoji" aria-hidden="true"><Icono :nombre="iconoProducto({ icono })" :tam="44" /></span>
       <span v-if="etiqueta" class="prod-etiqueta">{{ etiqueta }}</span>
     </div>
     <div class="prod-cuerpo">

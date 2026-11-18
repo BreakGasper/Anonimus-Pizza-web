@@ -7,7 +7,7 @@ import MenuTabs from '../components/MenuTabs.vue'
 import ProductoCard from '../components/ProductoCard.vue'
 
 function pedir(a) {
-  const ok = agregar({ clave: `ad-${a.id}`, nombre: a.nombre, detalle: '', precio: precioFinal(a), foto: a.foto || undefined, emoji: a.emoji })
+  const ok = agregar({ clave: `ad-${a.id}`, nombre: a.nombre, detalle: '', precio: precioFinal(a), foto: a.foto || undefined, icono: a.icono })
   avisar(ok ? `${a.nombre} agregado` : 'El carrito está lleno')
 }
 </script>
@@ -21,7 +21,7 @@ function pedir(a) {
     <h2 style="margin:18px 0 10px">{{ TITULOS_CATEGORIA[s.categoria] }}</h2>
     <div class="grilla">
       <ProductoCard v-for="a in s.lista" :key="a.id" :nombre="a.nombre" :desc="a.desc" :precio="precioFinal(a)" :precio-original="hayPromo(a) ? a.precio : undefined"
-        :etiqueta="hayPromo(a) ? 'Promo' : undefined" :foto="fotoDe(a)" :emoji="a.emoji" @agregar="pedir(a)" />
+        :etiqueta="hayPromo(a) ? 'Promo' : undefined" :foto="fotoDe(a)" :icono="a.icono" @agregar="pedir(a)" />
     </div>
   </template>
 </template>

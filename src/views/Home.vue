@@ -1,5 +1,7 @@
 <script setup>
 import Logo from '../components/Logo.vue'
+import Icono from '../components/Icono.vue'
+import { iconoProducto } from '../utils/iconos.js'
 import { money } from '../data/menu.js'
 import { imgBase } from '../data/imagenes.js'
 import { favoritas, enPromocion, precioFinal, hayPromo, fotoDe, rutaDe } from '../store/menu.js'
@@ -20,12 +22,12 @@ import { favoritas, enPromocion, precioFinal, hayPromo, fotoDe, rutaDe } from '.
   </section>
 
   <section v-if="enPromocion.length" class="seccion">
-    <div class="seccion-cab"><h2>🏷️ En promoción</h2></div>
+    <div class="seccion-cab"><h2><Icono nombre="etiqueta" :tam="22" class="txt" />En promoción</h2></div>
     <div class="carrusel">
       <router-link v-for="e in enPromocion" :key="e.id" :to="rutaDe(e)" class="fav promo-fav">
         <span class="fav-etq">Promo</span>
         <img v-if="fotoDe(e)" :src="fotoDe(e)" :alt="e.nombre" loading="lazy" width="112" height="112" />
-        <span v-else class="fav-emoji" aria-hidden="true">{{ e.emoji || '🍕' }}</span>
+        <span v-else class="fav-emoji" aria-hidden="true"><Icono :nombre="iconoProducto(e)" :tam="52" /></span>
         <b>{{ e.nombre }}</b>
         <span class="desc"><s class="tachado">{{ money(e.precio) }}</s> <b class="ahora">{{ money(precioFinal(e)) }}</b></span>
       </router-link>
@@ -33,11 +35,11 @@ import { favoritas, enPromocion, precioFinal, hayPromo, fotoDe, rutaDe } from '.
   </section>
 
   <section v-if="favoritas.length" class="seccion">
-    <div class="seccion-cab"><h2>Las favoritas</h2><router-link to="/especialidades">Ver todas →</router-link></div>
+    <div class="seccion-cab"><h2>Las favoritas</h2><router-link to="/especialidades">Ver todas<Icono nombre="derecha" :tam="16" class="fin" /></router-link></div>
     <div class="carrusel">
       <router-link v-for="e in favoritas" :key="e.id" :to="rutaDe(e)" class="fav">
         <img v-if="fotoDe(e)" :src="fotoDe(e)" :alt="e.nombre" loading="lazy" width="112" height="112" />
-        <span v-else class="fav-emoji" aria-hidden="true">{{ e.emoji || '🍕' }}</span>
+        <span v-else class="fav-emoji" aria-hidden="true"><Icono :nombre="iconoProducto(e)" :tam="52" /></span>
         <b>{{ e.nombre }}</b>
         <span class="desc">{{ hayPromo(e) ? '' : 'desde ' }}{{ money(precioFinal(e)) }}</span>
       </router-link>
@@ -54,7 +56,7 @@ import { favoritas, enPromocion, precioFinal, hayPromo, fotoDe, rutaDe } from '.
   </section>
 
   <router-link to="/paquetes" class="promo">
-    <span style="font-size:2.4rem" aria-hidden="true">🎁</span>
+    <span class="promo-ico" aria-hidden="true"><Icono nombre="promo" :tam="40" /></span>
     <div class="grow" style="flex:1"><b>Paquetes y promos</b><p class="desc" style="color:#bfe6cc;margin:2px 0 0">Más pizza por menos. Mira las promociones.</p></div>
     <span class="btn chico claro">Ver</span>
   </router-link>

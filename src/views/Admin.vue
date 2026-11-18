@@ -122,7 +122,7 @@ function pitar() {
 }
 function alertaNuevo(p) {
   if (sonido.value) pitar()
-  aviso.value = `🍕 Nuevo pedido de ${p.nombre} · ${money(p.total || 0)}`
+  aviso.value = `Nuevo pedido de ${p.nombre} · ${money(p.total || 0)}`
   clearTimeout(tAviso); tAviso = setTimeout(() => (aviso.value = ''), 6000)
 }
 
@@ -225,12 +225,12 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
     <header class="adm-cab">
       <div class="adm-marca"><span class="adm-logo"><Logo /></span><div><b>Panel de administración</b><small>Anonimus Pizza</small></div></div>
       <div v-if="usuario" class="adm-usuario">
-        <span class="adm-correo" title="Cuenta conectada">👤 {{ usuario.email }}</span>
+        <span class="adm-correo" title="Cuenta conectada"><Icono nombre="usuario" :tam="16" class="txt" />{{ usuario.email }}</span>
         <span v-if="rol" :class="['rol-insignia', rol]">{{ ROL_ETIQUETA[rol] }}</span>
-        <label class="interruptor" title="Aviso sonoro de pedidos nuevos"><input type="checkbox" v-model="sonido" @change="guardarSonido" /><span>🔔 Sonido</span></label>
+        <label class="interruptor" title="Aviso sonoro de pedidos nuevos"><input type="checkbox" v-model="sonido" @change="guardarSonido" /><span><Icono nombre="campana" :tam="16" class="txt" />Sonido</span></label>
         <button class="btn chico claro" @click="signOut(auth)">Salir</button>
       </div>
-      <router-link v-else to="/" class="btn chico claro">← Ir a la tienda</router-link>
+      <router-link v-else to="/" class="btn chico claro"><Icono nombre="izquierda" :tam="16" class="txt" />Ir a la tienda</router-link>
     </header>
 
     <p v-if="cargando" class="sub">Cargando…</p>
@@ -244,7 +244,7 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
         </label>
         <label class="campo">Contraseña
           <span class="clave"><input v-model="clave" :type="verClave ? 'text' : 'password'" autocomplete="current-password" />
-            <button type="button" class="ojo" :aria-label="verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'" @click="verClave = !verClave">{{ verClave ? '🙈' : '👁️' }}</button></span>
+            <button type="button" class="ojo" :aria-label="verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'" @click="verClave = !verClave"><Icono :nombre="verClave ? 'ojoCerrado' : 'ojo'" :tam="20" /></button></span>
         </label>
         <p v-if="errorLogin" class="error" role="alert">{{ errorLogin }}</p>
         <button class="btn block" :disabled="entrando">{{ entrando ? 'Entrando…' : 'Entrar' }}</button>
@@ -300,15 +300,15 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
                 <div style="text-align:right"><span :class="['estado', p.estado]">{{ ETIQUETA[p.estado] || p.estado }}</span><div class="precio">{{ money(p.total) }}</div></div>
               </div>
               <div class="contacto">
-                <a :href="'tel:' + p.telefono" class="enlace">📞 {{ p.telefono }}</a>
-                <a :href="mapa(p)" target="_blank" rel="noopener" class="enlace">📍 {{ p.direccion }}</a>
+                <a :href="'tel:' + p.telefono" class="enlace"><Icono nombre="telefono" :tam="16" class="txt" />{{ p.telefono }}</a>
+                <a :href="mapa(p)" target="_blank" rel="noopener" class="enlace"><Icono nombre="ubicacion" :tam="16" class="txt" />{{ p.direccion }}</a>
               </div>
               <ul class="lineas"><li v-for="(i, n) in p.items" :key="n"><b>{{ i.cantidad }}×</b> {{ i.nombre }}<span v-if="i.detalle" class="desc"> — {{ i.detalle }}</span></li></ul>
               <div v-if="p.notas" class="aviso">Notas: {{ p.notas }}</div>
               <p v-if="p.estado === 'cancelado'" class="desc" style="margin:8px 0 0">Cancelado<template v-if="horaCancelado(p)"> el {{ horaCancelado(p) }}</template>. No cuenta en las ventas.</p>
               <div class="acciones">
                 <button v-if="SIGUIENTE[p.estado]" class="btn chico verde" @click="cambiarEstado(p, SIGUIENTE[p.estado])">Pasar a: {{ ETIQUETA[SIGUIENTE[p.estado]] }}</button>
-                <button v-if="puedeGestionar && p.estado !== 'cancelado'" class="btn chico cancelar-btn" @click="cancelar(p)">✕ Cancelar pedido</button>
+                <button v-if="puedeGestionar && p.estado !== 'cancelado'" class="btn chico cancelar-btn" @click="cancelar(p)"><Icono nombre="cerrar" :tam="16" class="txt" />Cancelar pedido</button>
                 <button v-if="puedeGestionar && p.estado === 'cancelado'" class="btn chico claro" @click="reabrir(p)">Reabrir</button>
               </div>
             </article>
@@ -337,9 +337,9 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
             <div class="tarjeta">
               <h3>Ventas de los últimos 7 días</h3>
               <div class="barras" role="img" aria-label="Ventas por día">
-                <div v-for="d in dias" :key="d.clave" class="barra"><span class="v">{{ d.ventas ? money(d.ventas) : '' }}</span><i :style="{ height: d.alto + '%' }"></i><span class="n">{{ d.nombre }}</span><span class="canc">{{ d.cancelados ? '✕ ' + d.cancelados : '' }}</span></div>
+                <div v-for="d in dias" :key="d.clave" class="barra"><span class="v">{{ d.ventas ? money(d.ventas) : '' }}</span><i :style="{ height: d.alto + '%' }"></i><span class="n">{{ d.nombre }}</span><span class="canc">{{ d.cancelados ? '× ' + d.cancelados : '' }}</span></div>
               </div>
-              <p class="desc" style="margin-top:6px">✕ = pedidos cancelados ese día (no suman a las ventas).</p>
+              <p class="desc" style="margin-top:6px">× = pedidos cancelados ese día (no suman a las ventas).</p>
             </div>
             <div class="tarjeta">
               <h3>Más vendidos {{ TITULO_PERIODO[periodoResumen] }}</h3>

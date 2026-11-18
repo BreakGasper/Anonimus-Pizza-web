@@ -13,7 +13,7 @@ const t = () => TAMANOS.find((x) => x.id === tamano.value)
 
 function pedir(e) {
   const tam = t()
-  const ok = agregar({ clave: `esp-${e.id}-${tam.id}`, nombre: `Pizza ${e.nombre}`, detalle: `${tam.nombre} (${tam.cm})`, precio: precioPorTamano(precioFinal(e), tam), foto: e.foto || undefined, emoji: e.emoji })
+  const ok = agregar({ clave: `esp-${e.id}-${tam.id}`, nombre: `Pizza ${e.nombre}`, detalle: `${tam.nombre} (${tam.cm})`, precio: precioPorTamano(precioFinal(e), tam), foto: e.foto || undefined, icono: e.icono })
   avisar(ok ? `${e.nombre} agregada` : 'El carrito está lleno')
 }
 </script>
@@ -27,6 +27,6 @@ function pedir(e) {
   <p v-if="!especialidades.length" class="sub">Por ahora no hay especialidades disponibles.</p>
   <div class="grilla">
     <ProductoCard v-for="e in especialidades" :key="e.id" :nombre="e.nombre" :desc="e.desc" :precio="precioPorTamano(precioFinal(e), t())"
-      :precio-original="hayPromo(e) ? precioPorTamano(e.precio, t()) : undefined" :etiqueta="hayPromo(e) ? 'Promo' : undefined" :foto="fotoDe(e)" :emoji="e.emoji" @agregar="pedir(e)" />
+      :precio-original="hayPromo(e) ? precioPorTamano(e.precio, t()) : undefined" :etiqueta="hayPromo(e) ? 'Promo' : undefined" :foto="fotoDe(e)" :icono="e.icono" @agregar="pedir(e)" />
   </div>
 </template>

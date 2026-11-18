@@ -6,6 +6,7 @@ import { crearPedido } from '../firebase/pedidos.js'
 import { guardarEnHistorial } from '../store/historial.js'
 import { money } from '../data/menu.js'
 import Icono from '../components/Icono.vue'
+import { iconoProducto } from '../utils/iconos.js'
 import { resolverFoto } from '../store/menu.js'
 
 const route = useRoute()
@@ -97,7 +98,7 @@ async function confirmar() {
         <div class="fila">
           <div class="item-foto" aria-hidden="true">
             <img v-if="resolverFoto(i.foto)" :src="resolverFoto(i.foto)" alt="" width="72" height="72" decoding="async" />
-            <span v-else>{{ i.emoji || '🍕' }}</span>
+            <span v-else><Icono :nombre="iconoProducto(i)" :tam="34" /></span>
           </div>
           <div class="grow">
             <b>{{ i.nombre }}</b>
@@ -123,7 +124,7 @@ async function confirmar() {
       <section class="entrega">
         <h2 style="margin:0 0 6px">¿Dónde la llevamos?</h2>
         <div v-if="guardados" class="guardados" role="status">
-          <span>✔ Usamos los datos de tu compra anterior.</span>
+          <span><Icono nombre="check" :tam="16" class="txt" /> Usamos los datos de tu compra anterior.</span>
           <button type="button" class="enlace-btn" @click="olvidarDatos">Borrar mis datos</button>
         </div>
         <form @submit.prevent="confirmar" novalidate>
@@ -149,7 +150,7 @@ async function confirmar() {
           <p class="privado">Tus datos se guardan solo en este dispositivo para tu próxima compra.</p>
           <p v-if="error" class="error" role="alert">{{ error }}</p>
           <button class="btn block" :disabled="enviando">{{ enviando ? 'Enviando…' : 'Confirmar pedido · ' + money(total) }}</button>
-          <button type="button" class="btn block claro" style="margin-top:10px" @click="volver">← Volver al carrito</button>
+          <button type="button" class="btn block claro" style="margin-top:10px" @click="volver"><Icono nombre="izquierda" :tam="18" class="txt" />Volver al carrito</button>
         </form>
       </section>
 
@@ -157,7 +158,7 @@ async function confirmar() {
         <h3>Tu pedido</h3>
         <ul>
           <li v-for="i in items" :key="i.clave">
-            <span class="mini" aria-hidden="true"><img v-if="resolverFoto(i.foto)" :src="resolverFoto(i.foto)" alt="" width="40" height="40" /><span v-else>{{ i.emoji || '🍕' }}</span></span>
+            <span class="mini" aria-hidden="true"><img v-if="resolverFoto(i.foto)" :src="resolverFoto(i.foto)" alt="" width="40" height="40" /><span v-else><Icono :nombre="iconoProducto(i)" :tam="34" /></span></span>
             <span class="grow">{{ i.cantidad }} × {{ i.nombre }}</span>
             <b>{{ money(i.precio * i.cantidad) }}</b>
           </li>

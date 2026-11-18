@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { initializeApp, deleteApp } from 'firebase/app'
 import { getAuth, connectAuthEmulator, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { collection, doc, onSnapshot, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import Icono from './Icono.vue'
 import { dbAdmin as db } from '../firebase/admin.js'
 import { firebaseConfig, correoDeTelefono } from '../firebase/claves.js'
 
@@ -121,7 +122,7 @@ const fecha = (p) => (p.creado?.toDate ? p.creado.toDate().toLocaleDateString('e
         </label>
         <label class="campo">Contraseña (mínimo 6)
           <span class="clave"><input v-model="f.clave" :type="verClave ? 'text' : 'password'" autocomplete="new-password" />
-            <button type="button" class="ojo" :aria-label="verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'" @click="verClave = !verClave">{{ verClave ? '🙈' : '👁️' }}</button></span>
+            <button type="button" class="ojo" :aria-label="verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'" @click="verClave = !verClave"><Icono :nombre="verClave ? 'ojoCerrado' : 'ojo'" :tam="20" /></button></span>
         </label>
         <label class="campo">Perfil
           <select v-model="f.rol"><option v-for="r in ROLES" :key="r.id" :value="r.id">{{ r.nombre }}</option></select>
@@ -141,7 +142,7 @@ const fecha = (p) => (p.creado?.toDate ? p.creado.toDate().toLocaleDateString('e
         <div class="fila" style="align-items:flex-start">
           <div class="grow">
             <b>{{ p.nombre }}</b><span v-if="p.id === uidActual" class="desc"> (tú)</span>
-            <div class="desc"><template v-if="p.telefono">📞 {{ p.telefono }}</template><template v-if="fecha(p)"> · registrado {{ fecha(p) }}</template></div>
+            <div class="desc"><template v-if="p.telefono"><Icono nombre="telefono" :tam="14" class="txt" />{{ p.telefono }}</template><template v-if="fecha(p)"> · registrado {{ fecha(p) }}</template></div>
           </div>
           <span :class="['rol-insignia', rolDe(p)]">{{ nombreRol(rolDe(p)) }}</span>
         </div>
