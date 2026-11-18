@@ -4,7 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ---------- Perfiles del personal ----------
-    // Cada persona del personal tiene un documento /admins/{uid} con su rol: 'admin', 'tienda' o 'empleado'
+    // Cada persona del personal tiene un documento /admins/{uid} con su rol: 'admin', 'tienda', 'empleado' o 'repartidor'
     // (los documentos sin rol, creados a mano en la consola, cuentan como 'admin'). Si 'activo' es false, no tiene acceso.
     // Las cuentas nuevas las registra un admin desde el panel; la primera se crea desde la consola de Firebase.
     function personal() {
@@ -24,13 +24,23 @@ service cloud.firestore {
     }
     function esTienda() { return tienePerfil() && personal().get('rol', 'admin') == 'tienda'; }
     function esEmpleado() { return tienePerfil() && personal().get('rol', 'admin') == 'empleado'; }
+    function esRepartidor() { return tienePerfil() && personal().get('rol', 'admin') == 'repartidor'; }
+    // Un uid que corresponde a un repartidor activo (para asignarle un pedido).
+    function repartidorValido(uid) {
+      return uid is string
+        && exists(/databases/$(database)/documents/admins/$(uid))
+        && get(/databases/$(database)/documents/admins/$(uid)).data.get('rol', 'admin') == 'repartidor'
+        && get(/databases/$(database)/documents/admins/$(uid)).data.get('activo', true) == true;
+    }
 
     // Cada persona lee su propio perfil (la app lo usa para saber su rol); un admin lee todos. Solo un admin crea o cambia perfiles.
+    // La tienda y el empleado solo pueden ver los perfiles de repartidor (para elegir a quién asignar un pedido).
     match /admins/{uid} {
-      allow read: if request.auth != null && (request.auth.uid == uid || esAdmin());
+      allow read: if request.auth != null && (request.auth.uid == uid || esAdmin()
+                  || ((esTienda() || esEmpleado()) && resource.data.get('rol', 'admin') == 'repartidor'));
       allow create, update: if esAdmin()
                             && request.resource.data.keys().hasOnly(['nombre', 'telefono', 'rol', 'activo', 'creado', 'creadoPor'])
-                            && request.resource.data.rol in ['admin', 'tienda', 'empleado']
+                            && request.resource.data.rol in ['admin', 'tienda', 'empleado', 'repartidor']
                             && request.resource.data.nombre is string
                             && request.resource.data.nombre.size() > 0 && request.resource.data.nombre.size() <= 60
                             && request.resource.data.activo is bool;
@@ -60,20 +70,34 @@ service cloud.firestore {
                         || (request.auth != null && request.resource.data.uid == request.auth.uid))
                     && request.resource.data.estado == 'nuevo'
                     && request.resource.data.creado == request.time;
-      // Admin y tienda ven todos; el empleado solo los que están por atender; el cliente, los suyos.
+      // Admin y tienda ven todos; el empleado solo los que están por atender; el repartidor, solo los que le asignaron y van en camino; el cliente, los suyos.
       allow read: if esAdmin() || esTienda()
                   || (esEmpleado() && resource.data.estado in ['nuevo', 'preparando', 'en_camino'])
+                  || (esRepartidor() && resource.data.estado == 'en_camino' && resource.data.get('repartidorUid', '') == request.auth.uid)
                   || (request.auth != null && 'uid' in resource.data && resource.data.uid == request.auth.uid);
       // Los pedidos no se borran (la contabilidad no se puede alterar): se cancelan cambiando su estado.
       // Reclamar un pedido hecho sin sesión: el cliente que lo hizo (y conoce su identificador) lo pasa a su cuenta.
       // Solo se permite una vez (si aún no tiene dueño), solo a su propio uid, y sin tocar ningún otro campo.
       // El empleado solo puede avanzar el estado un paso (nuevo → preparando → en camino → entregado); no cancela ni edita nada más.
+      // Al pasar a "en camino" puede asignar el pedido a un repartidor activo (campos repartidorUid y repartidorNombre).
+      // El repartidor solo puede marcar como entregado un pedido que le asignaron y va en camino; no cambia nada más.
       allow update: if esAdmin() || esTienda()
                     || (esEmpleado()
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado'])
-                        && ((resource.data.estado == 'nuevo' && request.resource.data.estado == 'preparando')
-                            || (resource.data.estado == 'preparando' && request.resource.data.estado == 'en_camino')
-                            || (resource.data.estado == 'en_camino' && request.resource.data.estado == 'entregado')))
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'repartidorUid', 'repartidorNombre'])
+                        && ((resource.data.estado == 'nuevo' && request.resource.data.estado == 'preparando'
+                             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado']))
+                            || (resource.data.estado == 'preparando' && request.resource.data.estado == 'en_camino'
+                                && (!('repartidorUid' in request.resource.data)
+                                    || (repartidorValido(request.resource.data.repartidorUid)
+                                        && request.resource.data.repartidorNombre is string
+                                        && request.resource.data.repartidorNombre.size() <= 60)))
+                            || (resource.data.estado == 'en_camino' && request.resource.data.estado == 'entregado'
+                                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado']))))
+                    || (esRepartidor()
+                        && resource.data.estado == 'en_camino'
+                        && resource.data.get('repartidorUid', '') == request.auth.uid
+                        && request.resource.data.estado == 'entregado'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado']))
                     || (request.auth != null
                         && !('uid' in resource.data)
                         && request.resource.data.uid == request.auth.uid

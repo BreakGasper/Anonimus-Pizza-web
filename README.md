@@ -19,23 +19,26 @@ App web para hacer **pedidos de pizzas a domicilio**, personalizadas, con entreg
 - Pedidos en vivo con aviso sonoro y notificaciones en el teléfono; avanzar estado (nuevo → preparando → en camino → entregado) o **cancelar** (los pedidos no se borran).
 - Menú editable: productos, precios, promociones, favoritas, ocultar/ordenar, **fotos** (cámara o galería), ícono de respaldo.
 - **Resumen** de ventas por periodo (vendidos, cancelados, ticket promedio, gráfica de 7 días, lo más vendido).
-- **Usuarios** del panel con tres perfiles (ver tabla).
+- **Usuarios** del panel con cuatro perfiles (ver tabla).
 
 ## Perfiles del panel
 
 Las **reglas de Firestore** hacen cumplir los permisos (no solo la pantalla).
 
-| | Admin | Tienda | Empleado |
-|---|---|---|---|
-| Ver pedidos | todos | todos | solo los **por atender** |
-| Avanzar estado (un paso a la vez) | sí | sí | sí |
-| Cancelar / reabrir pedidos | sí | sí | no |
-| Menú, promociones, favoritas y fotos | sí | sí | no |
-| Restablecer el menú inicial | sí | no | no |
-| Resumen de ventas | sí | no | no |
-| Registrar usuarios, cambiar perfil, activar/desactivar | sí | no | no |
+| | Admin | Tienda | Empleado | Repartidor |
+|---|---|---|---|---|
+| Ver pedidos | todos | todos | solo los **por atender** | solo los **que le asignaron** y van en camino |
+| Avanzar estado (un paso a la vez) | sí | sí | sí | solo "en camino → entregado" |
+| Asignar repartidor al pasar a "en camino" | sí | sí | sí | no |
+| Cambiar de repartidor | sí | sí | no | no |
+| Cancelar / reabrir pedidos | sí | sí | no | no |
+| Menú, promociones, favoritas y fotos | sí | sí | no | no |
+| Restablecer el menú inicial | sí | no | no | no |
+| Resumen de ventas | sí | no | no | no |
+| Registrar usuarios, cambiar perfil, activar/desactivar | sí | no | no | no |
 
 - Los pedidos por atender (nuevo, preparando, en camino) salen siempre **del más viejo al más nuevo**, de cualquier día; después los ya atendidos, del más reciente al más antiguo.
+- **Repartidores:** al pasar un pedido de "preparando" a "en camino" el panel abre la lista de repartidores activos para elegir quién lo lleva (o "Sin repartidor" si lo entrega la tienda). El pedido guarda `repartidorUid` y `repartidorNombre`. El repartidor solo ve su lista de pedidos por entregar (con teléfono, dirección en el mapa y notas), recibe un aviso cuando le asignan uno y lo marca como **entregado**; entonces sale de su lista. La tienda y el admin pueden cambiar de repartidor mientras el pedido va en camino.
 - El personal entra con **teléfono + contraseña** (Firebase Authentication; internamente `<10 dígitos>@admin.anonimus.pizza`). El administrador original también puede entrar con Google. Ni teléfonos ni contraseñas están en el código.
 - Un perfil `activo: false` no tiene ningún acceso. No se puede desactivar la propia cuenta ni al último admin.
 - El panel usa su **propia sesión** de Firebase (app "admin"), separada de la de los clientes; las cuentas `@admin.anonimus.pizza` no pueden registrarse ni entrar como clientes.
@@ -96,8 +99,8 @@ Sin conexión a Firestore la tienda usa el menú inicial de `src/data/menu.js`.
 
 | Colección / documento | Contenido | Quién escribe |
 |---|---|---|
-| `pedidos/{id}` | pedido: datos de entrega, `items`, `total`, `estado`, `uid` opcional | cualquiera crea; personal actualiza según perfil; **nadie borra** |
-| `admins/{uid}` | `nombre`, `telefono`, `rol` (`admin`/`tienda`/`empleado`), `activo` | admin |
+| `pedidos/{id}` | pedido: datos de entrega, `items`, `total`, `estado`, `uid` opcional, y al ir en camino `repartidorUid`/`repartidorNombre` | cualquiera crea; personal actualiza según perfil; **nadie borra** |
+| `admins/{uid}` | `nombre`, `telefono`, `rol` (`admin`/`tienda`/`empleado`/`repartidor`), `activo` | admin |
 | `config/menu` | `items[]` (todo el menú) y `fotosVersion` | admin / tienda |
 | `config/fotos` | `fotos` (id → imagen WebP en data URL) y `version` | admin / tienda |
 

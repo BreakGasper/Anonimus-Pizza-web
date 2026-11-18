@@ -6,6 +6,7 @@ import { collection, query, orderBy, where, limit, onSnapshot, updateDoc, getDoc
 import { authAdmin as auth, dbAdmin as db } from '../firebase/admin.js'
 import { correoDeTelefono } from '../firebase/claves.js'
 import { money } from '../data/menu.js'
+import { avisar } from '../store/toast.js'
 import Logo from '../components/Logo.vue'
 import Icono from '../components/Icono.vue'
 import AdminMenu from '../components/AdminMenu.vue'
@@ -57,8 +58,10 @@ const ETIQUETA = { nuevo: 'Nuevo', preparando: 'Preparando', en_camino: 'En cami
 const rol = ref(null)
 const esAdminRol = computed(() => rol.value === 'admin')
 const esEmpleadoRol = computed(() => rol.value === 'empleado')
+const esRepartidorRol = computed(() => rol.value === 'repartidor')
+const soloPedidos = computed(() => esEmpleadoRol.value || esRepartidorRol.value) // sin pestañas ni filtros: solo su lista
 const puedeGestionar = computed(() => rol.value === 'admin' || rol.value === 'tienda') // cancelar, reabrir y menú
-const ROL_ETIQUETA = { admin: 'Administrador', tienda: 'Tienda', empleado: 'Empleado' }
+const ROL_ETIQUETA = { admin: 'Administrador', tienda: 'Tienda', empleado: 'Empleado', repartidor: 'Repartidor' }
 const PENDIENTES = ['nuevo', 'preparando', 'en_camino']
 
 async function detectarRol(u) {
@@ -67,7 +70,7 @@ async function detectarRol(u) {
     if (s.exists()) {
       const d = s.data()
       if (d.activo === false) return 'inactivo'
-      return ['admin', 'tienda', 'empleado'].includes(d.rol) ? d.rol : 'admin' // un perfil sin rol (creado a mano) es admin
+      return ['admin', 'tienda', 'empleado', 'repartidor'].includes(d.rol) ? d.rol : 'admin' // un perfil sin rol (creado a mano) es admin
     }
   } catch { /* se intenta la comprobación de abajo */ }
   // Sin perfil: solo puede ser el admin de Google (autorizado por su correo en las reglas). Se comprueba con una lectura de prueba.
@@ -77,7 +80,10 @@ async function detectarRol(u) {
 function escuchar() {
   cortar?.(); errorDatos.value = ''; primera = true
   // El empleado solo puede leer los pedidos por atender (lo exigen las reglas); admin y tienda leen todos.
-  const q = rol.value === 'empleado'
+  // El repartidor solo lee los pedidos que le asignaron y van en camino (las reglas también lo exigen).
+  const q = rol.value === 'repartidor'
+    ? query(collection(db, 'pedidos'), where('repartidorUid', '==', usuario.value.uid), where('estado', '==', 'en_camino'), limit(100))
+    : rol.value === 'empleado'
     ? query(collection(db, 'pedidos'), where('estado', 'in', PENDIENTES), limit(300))
     : query(collection(db, 'pedidos'), orderBy('creado', 'desc'), limit(500))
   cortar = onSnapshot(q, (s) => {
@@ -129,7 +135,7 @@ function pitar() {
 }
 function alertaNuevo(p) {
   if (sonido.value) pitar()
-  aviso.value = `Nuevo pedido de ${p.nombre} · ${money(p.total || 0)}`
+  aviso.value = `${esRepartidorRol.value ? 'Pedido asignado a ti' : 'Nuevo pedido'} de ${p.nombre} · ${money(p.total || 0)}`
   clearTimeout(tAviso); tAviso = setTimeout(() => (aviso.value = ''), 6000)
   notificar(p)
 }
@@ -173,8 +179,8 @@ async function notificar(p) {
   if (!avisosActivos.value || (document.visibilityState === 'visible' && document.hasFocus())) return // con el panel a la vista basta el aviso en pantalla
   const r = await registrarSW(); if (!r) return
   try {
-    await r.showNotification('Nuevo pedido · ' + money(p.total || 0), {
-      body: `${p.nombre || 'Cliente'} · folio ${String(p.id || '').slice(0, 6).toUpperCase()}`, icon: '/icono-192.png', badge: '/icono-192.png',
+    await r.showNotification((esRepartidorRol.value ? 'Pedido para entregar · ' : 'Nuevo pedido · ') + money(p.total || 0), {
+      body: `${p.nombre || 'Cliente'}${esRepartidorRol.value && p.direccion ? ' · ' + p.direccion : ''} · folio ${String(p.id || '').slice(0, 6).toUpperCase()}`, icon: '/icono-192.png', badge: '/icono-192.png',
       tag: 'pedido-' + p.id, data: { id: p.id }, renotify: true, requireInteraction: true, vibrate: [200, 100, 200],
     })
   } catch { /* sin permiso o sin soporte */ }
@@ -195,7 +201,7 @@ async function abrirPedidoPendiente() {
   if (route.query.pedido) router.replace({ path: '/admin' })
   if (!p) return
   pestana.value = 'pedidos'; busqueda.value = ''
-  if (!esEmpleadoRol.value) { estado.value = esPend(p) ? 'activos' : 'todos'; periodo.value = 'todo' }
+  if (!soloPedidos.value) { estado.value = esPend(p) ? 'activos' : 'todos'; periodo.value = 'todo' }
   resaltado.value = id
   await nextTick()
   document.getElementById('ped-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -285,13 +291,41 @@ const topProductos = computed(() => {
 async function cambiarEstado(p, nuevo) {
   try { await updateDoc(doc(db, 'pedidos', p.id), { estado: nuevo }) } catch { errorDatos.value = 'No se pudo actualizar el pedido.' }
 }
+// Pasar de "preparando" a "en camino": primero se elige quién lo lleva. Admin y tienda también pueden cambiar de repartidor después.
+const asignando = ref(null) // { pedido, cambio: bool }
+const repartidores = ref([])
+const cargandoRep = ref(false)
+const errorRep = ref('')
+async function pasar(p) {
+  if (SIGUIENTE[p.estado] === 'en_camino') return abrirAsignacion(p, false)
+  return cambiarEstado(p, SIGUIENTE[p.estado])
+}
+async function abrirAsignacion(p, cambio) {
+  asignando.value = { pedido: p, cambio }; errorRep.value = ''; repartidores.value = []; cargandoRep.value = true
+  try {
+    const s = await getDocs(query(collection(db, 'admins'), where('rol', '==', 'repartidor')))
+    repartidores.value = s.docs.map((d) => ({ uid: d.id, ...d.data() })).filter((x) => x.activo !== false).sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es'))
+  } catch { errorRep.value = 'No se pudo cargar la lista de repartidores.' }
+  finally { cargandoRep.value = false }
+}
+const cerrarAsignacion = () => (asignando.value = null)
+async function asignar(rep) { // rep: un repartidor, o null = sin repartidor (lo entrega la tienda)
+  const { pedido, cambio } = asignando.value
+  const datos = rep ? { repartidorUid: rep.uid, repartidorNombre: String(rep.nombre || '').slice(0, 60) } : { repartidorUid: deleteField(), repartidorNombre: deleteField() }
+  try {
+    await updateDoc(doc(db, 'pedidos', pedido.id), cambio ? datos : { estado: 'en_camino', ...datos })
+    avisar(rep ? `${pedido.nombre}: lo lleva ${rep.nombre}` : `${pedido.nombre}: en camino sin repartidor`)
+    cerrarAsignacion()
+  } catch { errorRep.value = 'No se pudo asignar el pedido.' }
+}
+const marcarEntregado = (p) => cambiarEstado(p, 'entregado')
 // Los pedidos no se borran: se cancelan. Un pedido cancelado deja de contar en las ventas (queda en el historial y en el conteo de cancelados).
 async function cancelar(p) {
   if (!confirm(`¿Cancelar el pedido de ${p.nombre} (${money(p.total)})? Ya no se contará en las ventas.`)) return
   try { await updateDoc(doc(db, 'pedidos', p.id), { estado: 'cancelado', canceladoEn: serverTimestamp() }) } catch { errorDatos.value = 'No se pudo cancelar el pedido.' }
 }
 async function reabrir(p) {
-  try { await updateDoc(doc(db, 'pedidos', p.id), { estado: 'nuevo', canceladoEn: deleteField() }) } catch { errorDatos.value = 'No se pudo reabrir el pedido.' }
+  try { await updateDoc(doc(db, 'pedidos', p.id), { estado: 'nuevo', canceladoEn: deleteField(), repartidorUid: deleteField(), repartidorNombre: deleteField() }) } catch { errorDatos.value = 'No se pudo reabrir el pedido.' }
 }
 const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '')
 </script>
@@ -347,27 +381,42 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
         <p v-if="errorDatos" class="error" role="alert">{{ errorDatos }}</p>
         <div v-if="aviso" class="adm-aviso" role="status">{{ aviso }}</div>
 
-        <nav v-if="!esEmpleadoRol" class="adm-tabs" aria-label="Secciones">
+        <div v-if="asignando" class="asig" role="dialog" aria-modal="true" aria-label="Elegir repartidor" @click.self="cerrarAsignacion">
+          <div class="asig-caja">
+            <div class="asig-cab"><h3 style="margin:0">¿Quién lo lleva?</h3><button type="button" class="asig-x" aria-label="Cerrar" @click="cerrarAsignacion"><Icono nombre="cerrar" :tam="20" /></button></div>
+            <p class="desc" style="margin:0 0 12px">{{ asignando.pedido.nombre }} · {{ money(asignando.pedido.total || 0) }} · {{ asignando.pedido.direccion }}</p>
+            <p v-if="cargandoRep" class="sub">Cargando repartidores…</p>
+            <p v-if="errorRep" class="error" role="alert">{{ errorRep }}</p>
+            <p v-else-if="!cargandoRep && !repartidores.length" class="sub">No hay repartidores activos. Un administrador puede registrarlos en <b>Usuarios</b> con el perfil Repartidor.</p>
+            <button v-for="rp in repartidores" :key="rp.uid" type="button" :class="['asig-op', { actual: asignando.pedido.repartidorUid === rp.uid }]" @click="asignar(rp)">
+              <Icono nombre="usuario" :tam="20" /><span class="grow"><b>{{ rp.nombre }}</b><small v-if="rp.telefono" class="desc"> · {{ rp.telefono }}</small></span><Icono v-if="asignando.pedido.repartidorUid === rp.uid" nombre="check" :tam="18" />
+            </button>
+            <button v-if="!asignando.cambio" type="button" class="asig-op sin" @click="asignar(null)"><Icono nombre="derecha" :tam="20" /><span class="grow"><b>Sin repartidor</b><small class="desc"> · lo entrega la tienda</small></span></button>
+          </div>
+        </div>
+
+        <nav v-if="!soloPedidos" class="adm-tabs" aria-label="Secciones">
           <button :class="{ on: pestana === 'pedidos' }" @click="pestana = 'pedidos'">Pedidos <b v-if="nuevos" class="punto">{{ nuevos }}</b></button>
           <button v-if="esAdminRol" :class="{ on: pestana === 'resumen' }" @click="pestana = 'resumen'">Resumen</button>
           <button v-if="puedeGestionar" :class="{ on: pestana === 'menu' }" @click="pestana = 'menu'">Menú</button>
           <button v-if="esAdminRol" :class="{ on: pestana === 'usuarios' }" @click="pestana = 'usuarios'">Usuarios</button>
         </nav>
+        <h2 v-else-if="esRepartidorRol" style="margin:0 0 12px">Pedidos por entregar <small class="desc">· los que te asignó la tienda</small></h2>
         <h2 v-else style="margin:0 0 12px">Pedidos por atender <small class="desc">· del más viejo al más nuevo</small></h2>
 
         <!-- Pedidos -->
         <section v-if="pestana === 'pedidos'">
           <div class="adm-filtros">
             <input v-model="busqueda" class="buscar" type="search" placeholder="Buscar por nombre, teléfono o folio" aria-label="Buscar pedidos" />
-            <select v-if="!esEmpleadoRol" v-model="periodo" aria-label="Periodo">
+            <select v-if="!soloPedidos" v-model="periodo" aria-label="Periodo">
               <option value="hoy">Hoy</option><option value="7">Últimos 7 días</option><option value="todo">Todos</option>
             </select>
           </div>
-          <div v-if="!esEmpleadoRol" class="adm-estados" role="tablist">
+          <div v-if="!soloPedidos" class="adm-estados" role="tablist">
             <button v-for="e in [['activos', 'Activos'], ['todos', 'Todos'], ...ESTADOS.map((x) => [x, ETIQUETA[x]])]" :key="e[0]" :class="['chip', { on: estado === e[0] }]" @click="estado = e[0]">{{ e[1] }} <b>{{ conteo[e[0]] }}</b></button>
           </div>
 
-          <p v-if="!visibles.length && !errorDatos" class="sub">{{ esEmpleadoRol ? 'No hay pedidos por atender. ¡Todo al día!' : 'No hay pedidos con estos filtros.' }}</p>
+          <p v-if="!visibles.length && !errorDatos" class="sub">{{ esRepartidorRol ? 'No tienes pedidos por entregar. Te avisaremos cuando la tienda te asigne uno.' : esEmpleadoRol ? 'No hay pedidos por atender. ¡Todo al día!' : 'No hay pedidos con estos filtros.' }}</p>
           <div class="adm-lista">
             <article v-for="p in visibles" :key="p.id" :id="'ped-' + p.id" :class="['tarjeta', 'pedido', p.estado, { resaltado: resaltado === p.id }]">
               <div class="fila" style="align-items:flex-start">
@@ -383,9 +432,12 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
               </div>
               <ul class="lineas"><li v-for="(i, n) in p.items" :key="n"><b>{{ i.cantidad }}×</b> {{ i.nombre }}<span v-if="i.detalle" class="desc"> — {{ i.detalle }}</span></li></ul>
               <div v-if="p.notas" class="aviso">Notas: {{ p.notas }}</div>
+              <p v-if="p.estado === 'en_camino' && !esRepartidorRol" class="desc repartidor-linea"><Icono nombre="usuario" :tam="14" class="txt" />{{ p.repartidorNombre ? 'Lo lleva ' + p.repartidorNombre : 'Sin repartidor asignado' }}</p>
               <p v-if="p.estado === 'cancelado'" class="desc" style="margin:8px 0 0">Cancelado<template v-if="horaCancelado(p)"> el {{ horaCancelado(p) }}</template>. No cuenta en las ventas.</p>
               <div class="acciones">
-                <button v-if="SIGUIENTE[p.estado]" class="btn chico verde" @click="cambiarEstado(p, SIGUIENTE[p.estado])">Pasar a: {{ ETIQUETA[SIGUIENTE[p.estado]] }}</button>
+                <button v-if="esRepartidorRol" class="btn verde" @click="marcarEntregado(p)"><Icono nombre="check" :tam="18" class="txt" />Marcar como entregado</button>
+                <button v-else-if="SIGUIENTE[p.estado]" class="btn chico verde" @click="pasar(p)">Pasar a: {{ ETIQUETA[SIGUIENTE[p.estado]] }}</button>
+                <button v-if="puedeGestionar && p.estado === 'en_camino'" class="btn chico claro" @click="abrirAsignacion(p, true)">Cambiar repartidor</button>
                 <button v-if="puedeGestionar && p.estado !== 'cancelado'" class="btn chico cancelar-btn" @click="cancelar(p)"><Icono nombre="cerrar" :tam="16" class="txt" />Cancelar pedido</button>
                 <button v-if="puedeGestionar && p.estado === 'cancelado'" class="btn chico claro" @click="reabrir(p)">Reabrir</button>
               </div>
@@ -469,6 +521,14 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 .adm-estados .chip b { margin-left: 4px; opacity: .85; }
 .adm-lista { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .pedido { margin: 0; border-left: 5px solid var(--borde); }
+.repartidor-linea { margin: 8px 0 0; }
+.asig { position: fixed; inset: 0; z-index: 70; background: #000b; display: flex; align-items: flex-end; justify-content: center; }
+.asig-caja { background: var(--fondo); border: 1px solid var(--borde); border-radius: 22px 22px 0 0; width: 100%; max-width: 480px; max-height: 88dvh; overflow-y: auto; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
+.asig-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.asig-x { background: var(--sup2); border: 1px solid var(--borde); width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; }
+.asig-op { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--sup); border: 1.5px solid var(--borde); border-radius: 14px; padding: 14px; margin-bottom: 8px; min-height: 52px; }
+.asig-op.actual { border-color: var(--verde); } .asig-op.sin { border-style: dashed; color: var(--suave); }
+@media (min-width: 640px) { .asig { align-items: center; } .asig-caja { border-radius: 22px; } }
 .pedido.resaltado { outline: 3px solid var(--ambar); outline-offset: 2px; animation: late 1s ease-in-out 3; }
 @keyframes late { 50% { box-shadow: 0 0 0 8px #ffc24733; } }
 .pedido.nuevo { border-left-color: var(--rojo); } .pedido.preparando { border-left-color: #e0a100; } .pedido.en_camino { border-left-color: #3b82f6; } .pedido.entregado { border-left-color: var(--verde); } .pedido.cancelado { opacity: .65; }
@@ -476,7 +536,7 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 .enlace { color: #ffd48a; font-weight: 600; word-break: break-word; }
 .lineas { margin: 6px 0 0; padding-left: 20px; }
 .rol-insignia { font-size: .75rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--sup2); border: 1px solid var(--borde); }
-.rol-insignia.admin { background: #4a1d17; border-color: #8a3128; color: #ffb3aa; } .rol-insignia.tienda { background: #14391f; border-color: #1f6b3b; color: #b9efcd; } .rol-insignia.empleado { background: #1b2f55; border-color: #2c4f93; color: #bcd3ff; }
+.rol-insignia.admin { background: #4a1d17; border-color: #8a3128; color: #ffb3aa; } .rol-insignia.tienda { background: #14391f; border-color: #1f6b3b; color: #b9efcd; } .rol-insignia.repartidor { background: #4a3a0c; border-color: #8a6a1c; color: #ffd86b; } .rol-insignia.empleado { background: #1b2f55; border-color: #2c4f93; color: #bcd3ff; }
 .cancelar-btn { background: #e8392b1f; border: 1.5px solid #e8392b; color: #ff6a5c; box-shadow: none; }
 .resumen-grande { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .resumen .cancelados b { color: #ff6a5c; }

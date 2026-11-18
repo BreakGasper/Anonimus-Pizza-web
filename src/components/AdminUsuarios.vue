@@ -19,6 +19,7 @@ const ROLES = [
   { id: 'admin', nombre: 'Administrador', desc: 'Ve y configura todo: pedidos, ventas, menú, fotos, promociones y usuarios.' },
   { id: 'tienda', nombre: 'Tienda', desc: 'Pedidos (ver, avanzar y cancelar) y menú con promociones y fotos. No ve ventas ni usuarios.' },
   { id: 'empleado', nombre: 'Empleado', desc: 'Solo los pedidos por atender; puede avanzarlos (preparando, en camino, entregado).' },
+  { id: 'repartidor', nombre: 'Repartidor', desc: 'Solo ve los pedidos que la tienda le asigna al pasarlos a "en camino" y los marca como entregados.' },
 ]
 const nombreRol = (r) => ROLES.find((x) => x.id === r)?.nombre || r
 // Un perfil sin campo `rol` (creado a mano en la consola) cuenta como administrador, igual que en las reglas.
