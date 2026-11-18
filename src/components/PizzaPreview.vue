@@ -1,12 +1,13 @@
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
-import { imgBase, urlSprites, imgAtlas, slugDe, ORDEN_CAPAS, PIEZAS } from '../data/imagenes.js'
+import { imgBase, urlSprites, imgAtlas, slugDe, NIVELES_CAPAS, PIEZAS } from '../data/imagenes.js'
 
 const props = defineProps({
   ingredientes: { type: Array, default: () => [] },
   extras: { type: Array, default: () => [] }, // ids: 'salsa', 'queso'
   tamano: { type: String, default: 'med' },
   activa: { type: Boolean, default: false }, // resalta mientras se arrastra encima
+  semilla: { type: Number, default: 1 }, // cada valor distinto da una pizza distinta (posiciones, giros, orden)
 })
 
 const ESCALA = { ind: 0.68, med: 0.84, fam: 1 }
@@ -45,10 +46,13 @@ function azar(a) { return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a 
 
 const cache = new Map()
 // Reparte las piezas con "mejor candidato": cada nueva se coloca lejos de las anteriores, sin rejilla visible.
+// Es estable mientras no cambie la semilla: al agregar otro ingrediente, los que ya estaban no se mueven.
 function colocar(slug) {
   if (cache.has(slug)) return cache.get(slug)
-  const total = PIEZAS[slug], nSprites = meta.ingredientes[slug].piezas.length
-  const rnd = azar(semilla(slug)), Rmax = meta.pizza.radio * 0.74
+  const nSprites = meta.ingredientes[slug].piezas.length
+  const rnd = azar(semilla(`${slug}:${props.semilla}`)), Rmax = meta.pizza.radio * 0.74
+  const total = Math.round(PIEZAS[slug] * (1.2 + rnd() * 0.2)) // piezas de sobra; la cantidad mostrada varía por pizza
+  const densidad = 0.82 + rnd() * 0.36
   const out = []
   for (let i = 0; i < total; i++) {
     let mejor = null, dmej = -1
@@ -61,8 +65,19 @@ function colocar(slug) {
     }
     out.push({ ...mejor, s: Math.floor(rnd() * nSprites), rot: rnd() * Math.PI * 2, esc: 0.92 + rnd() * 0.22 })
   }
+  out.densidad = densidad
   cache.set(slug, out)
   return out
+}
+
+// Orden de apilado al azar dentro de cada nivel (el nivel de abajo siempre queda abajo).
+function ordenCapas() {
+  const rnd = azar(semilla(`orden:${props.semilla}`))
+  return NIVELES_CAPAS.flatMap((nivel) => {
+    const a = [...nivel]
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]] }
+    return a
+  })
 }
 
 /* ---------- Dibujo ---------- */
@@ -95,7 +110,7 @@ function dibujar() {
   }
 
   // ingredientes elegidos, en el orden de apilado
-  const elegidos = ORDEN_CAPAS.filter((n) => props.ingredientes.includes(n)).map(slugDe)
+  const elegidos = ordenCapas().filter((n) => props.ingredientes.includes(n)).map(slugDe)
   const reparto = Math.max(0.6, 1 - 0.07 * (elegidos.length - 1)) // con más ingredientes, menos piezas de cada uno
   const vigentes = new Set()
   let animando = false, pendiente = false
@@ -106,7 +121,7 @@ function dibujar() {
     pedirAtlas(slug)
     const im = atlas.get(slug)
     if (!im || im === 'error') { pendiente = pendiente || im === null; continue }
-    const piezas = colocar(slug), n = Math.max(1, Math.round(PIEZAS[slug] * reparto))
+    const piezas = colocar(slug), n = Math.min(piezas.length, Math.max(1, Math.round(PIEZAS[slug] * piezas.densidad * reparto)))
     const defs = meta.ingredientes[slug].piezas
     let nuevas = 0
     for (let i = 0; i < n; i++) {
@@ -187,6 +202,8 @@ onMounted(() => {
 })
 onBeforeUnmount(() => { observador?.disconnect(); cancelAnimationFrame(raf) })
 watch(() => [props.ingredientes.slice(), props.extras.slice()], programar, { deep: true })
+// Pizza nueva: se vuelve a repartir todo y las piezas caen otra vez.
+watch(() => props.semilla, () => { cache.clear(); vistos.clear(); programar() })
 </script>
 
 <template>
