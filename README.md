@@ -1,55 +1,122 @@
-# Anonimus-Pizza-web
-App Web para hacer pedidos de pizzas a domicilio personalizadas,  con entregas  y gestion de del dia
+# Anonimus Pizza
 
-## Panel de administración (`/admin`) y perfiles del personal
+App web para hacer **pedidos de pizzas a domicilio**, personalizadas, con entregas y gestión del día. Los clientes piden desde el celular o la computadora; el personal atiende los pedidos desde un panel con perfiles y permisos.
 
-Entra el personal con **teléfono + contraseña** (Firebase Authentication) o, el administrador original, con Google. Ni el teléfono ni la contraseña están en el código. Hay tres perfiles, y **las reglas de Firestore los hacen cumplir** (no solo la pantalla):
+- **Tienda:** https://anonimus-pizza.web.app
+- **Panel del personal:** `/admin`
+- **Costo:** corre en el plan gratuito de Firebase (Hosting + Firestore + Authentication); se publica sola desde GitHub.
+
+## Qué hace
+
+**Para el cliente**
+- Menú de **especialidades**, **paquetes/promos** y **adicionales** (calzones, bebidas), con fotos.
+- **Arma tu pizza:** elige tamaño e ingredientes tocándolos o arrastrándolos, y ve cómo queda la pizza (vista previa realista con posiciones al azar; solo caen los ingredientes que eliges). También hay "Sorpréndeme".
+- **Carrito en dos pasos** (carrito → datos de entrega) con los datos guardados en el dispositivo para la siguiente compra.
+- **Perfil** (`/perfil`): cuenta con correo/contraseña o Google para ver sus pedidos y tickets, del más reciente al más antiguo, con el estado en vivo. Los pedidos hechos sin cuenta en ese dispositivo se pasan a la cuenta al iniciar sesión.
+- Pensada para móvil (barra inferior, sin zoom accidental) y escritorio (menú superior, 2 columnas en "Arma tu pizza"). Interfaz en español, tema oscuro "horno" y un solo set de íconos de línea.
+
+**Para el personal (`/admin`)**
+- Pedidos en vivo con aviso sonoro; avanzar estado (nuevo → preparando → en camino → entregado) o **cancelar** (los pedidos no se borran).
+- Menú editable: productos, precios, promociones, favoritas, ocultar/ordenar, **fotos** (cámara o galería), ícono de respaldo.
+- **Resumen** de ventas por periodo (vendidos, cancelados, ticket promedio, gráfica de 7 días, lo más vendido).
+- **Usuarios** del panel con tres perfiles (ver tabla).
+
+## Perfiles del panel
+
+Las **reglas de Firestore** hacen cumplir los permisos (no solo la pantalla).
 
 | | Admin | Tienda | Empleado |
 |---|---|---|---|
 | Ver pedidos | todos | todos | solo los **por atender** |
-| Avanzar el estado (preparando → en camino → entregado) | sí | sí | sí (un paso a la vez) |
+| Avanzar estado (un paso a la vez) | sí | sí | sí |
 | Cancelar / reabrir pedidos | sí | sí | no |
-| Menú: productos, promociones, favoritas, **fotos** | sí | sí | no |
+| Menú, promociones, favoritas y fotos | sí | sí | no |
 | Restablecer el menú inicial | sí | no | no |
 | Resumen de ventas | sí | no | no |
-| **Registrar usuarios**, cambiar perfiles, activar/desactivar | sí | no | no |
+| Registrar usuarios, cambiar perfil, activar/desactivar | sí | no | no |
 
-- **Orden en todos los perfiles:** los pedidos por atender (nuevo, preparando, en camino) siempre salen **del más viejo al más nuevo**, de cualquier día; después los ya atendidos, del más reciente al más antiguo.
-- **Primer administrador (una sola vez, en la consola de Firebase):** 1) *Authentication → Método de acceso:* activar *Correo electrónico/contraseña*. 2) *Authentication → Usuarios → Agregar usuario:* correo `TELEFONO@admin.anonimus.pizza` y la contraseña; copiar el **UID**. 3) *Firestore → colección `admins`:* documento con ese UID y un campo `nombre` (un perfil sin campo `rol` cuenta como admin).
-- **Los demás usuarios** los registra un admin desde **Usuarios** en el panel (nombre, teléfono, contraseña y perfil). Se pueden **desactivar/activar** y cambiar de perfil (no se borran, para conservar el historial; no se puede desactivar la propia cuenta ni al último admin). Para cambiar la contraseña de alguien: borrarlo en Authentication y registrarlo de nuevo.
-- Los perfiles viven en `admins/{uid}` con `nombre`, `telefono`, `rol` (`admin`, `tienda` o `empleado`) y `activo`. Un perfil desactivado no tiene ningún acceso.
-- El panel usa su propia sesión de Firebase, separada de la de los clientes.
+- Los pedidos por atender (nuevo, preparando, en camino) salen siempre **del más viejo al más nuevo**, de cualquier día; después los ya atendidos, del más reciente al más antiguo.
+- El personal entra con **teléfono + contraseña** (Firebase Authentication; internamente `<10 dígitos>@admin.anonimus.pizza`). El administrador original también puede entrar con Google. Ni teléfonos ni contraseñas están en el código.
+- Un perfil `activo: false` no tiene ningún acceso. No se puede desactivar la propia cuenta ni al último admin.
+- El panel usa su **propia sesión** de Firebase (app "admin"), separada de la de los clientes; las cuentas `@admin.anonimus.pizza` no pueden registrarse ni entrar como clientes.
 
-Pruebas de las reglas: `npm run test:rules` (necesita Java).
+## Tecnología
 
-## Menú editable desde el panel
+- **Vue 3** (`<script setup>`) + **vue-router 4** (rutas con carga diferida) + **Vite 6**, JavaScript.
+- **Firebase** (SDK 11): Authentication, Firestore, Hosting. Sin Cloud Functions ni Storage (requieren plan de pago).
+- La tienda lee `config/*` por **REST** (sin cargar el SDK) y guarda copias en `localStorage`.
+- Vista previa de la pizza en `<canvas>` con atlas de sprites (`public/img/sprites`).
 
-En `/admin` → pestaña **Menú** se agregan, editan, ocultan, duplican, ordenan y borran **especialidades, paquetes y adicionales**; se marcan **favoritas** (carrusel del inicio) y se ponen **promociones** (precio rebajado, con el precio normal tachado). Las fotos se **suben desde el dispositivo** (cámara o galería), se eligen de la biblioteca incluida o se indican con una dirección `https://`.
+## Estructura
 
-- Todo el menú vive en **un solo documento** de Firestore (`config/menu`): la tienda lo lee con 1 lectura por visita (por REST, sin cargar el SDK) y guarda una copia local.
-- Si el documento no existe o no hay conexión, la tienda usa el menú inicial de `src/data/menu.js` (`MENU_INICIAL`).
-- Las reglas dejan leerlo a cualquiera y escribirlo solo a un administrador.
-- "Restablecer el menú inicial" en el panel devuelve los datos de `MENU_INICIAL`.
+```
+src/
+  views/        Home, Especialidades, Paquetes, Adicionales, ArmaPizza, Carrito, Ticket, Perfil, Admin
+  components/   Icono (set de íconos), PizzaPreview, ProductoCard, AdminMenu, AdminUsuarios, TicketPedido…
+  firebase/     claves (config pública), auth/db (clientes), admin (sesión del panel), pedidos, config
+  store/        cart, menu, historial, toast
+  data/         menu.js (menú inicial), imagenes.js
+  utils/        imagen.js (recorte/compresión de fotos), iconos.js
+public/img/     logo, base de pizza, fotos, sprites de ingredientes
+tests/          pruebas de las reglas de Firestore
+tools/          procesar-imagenes.py (genera sprites)
+firestore.rules reglas de seguridad
+```
 
-## Perfil de clientes (`/perfil`)
+## Desarrollo local
 
-Los clientes pueden crear una cuenta (correo y contraseña, o Google) para ver sus **pedidos y tickets** del más reciente al más antiguo, agrupados por día, y seguir el estado de cada pedido en vivo (Recibido → Preparando → En camino → Entregado).
+Requiere Node 22.
 
-- Con sesión iniciada, cada pedido nuevo se guarda con el `uid` de la cuenta. Las reglas dejan leer un pedido solo al administrador o a su dueño; nadie puede editarlo ni borrarlo (solo el admin). La consulta del perfil filtra por `uid` sin ordenar en el servidor (se ordena en el navegador), así que **no hace falta ningún índice**.
-- Quien compra sin cuenta ve en su perfil los pedidos hechos **en ese dispositivo** (guardados solo en su navegador), con el estado "Enviado". Al **iniciar sesión, esos pedidos se pasan a la cuenta** (las reglas permiten reclamar un pedido sin dueño una sola vez, solo a tu propio uid y sin tocar otros campos); desde entonces se ven en cualquier dispositivo y con su estado en vivo. Si otra persona entra en el mismo dispositivo, no ve los pedidos de otra cuenta.
-- Para activar los accesos: **Authentication → Método de acceso** → Correo/contraseña y Google; y en **Dominios autorizados** el dominio de la tienda.
+```bash
+npm install
+npm run dev        # servidor local (http://localhost:5173)
+npm run build      # compila a dist/
+npm run preview    # sirve dist/
+npm run test:rules # pruebas de las reglas con el emulador (necesita Java)
+```
 
-### Fotos subidas y topes
+Sin conexión a Firestore la tienda usa el menú inicial de `src/data/menu.js`.
 
-- **Sin servidor de pago:** Firebase Storage exige el plan de pago, así que las fotos se guardan **dentro de Firestore** (documento `config/fotos`). En el navegador se recortan cuadradas y se reducen a ≈30 KB (WebP), de modo que 20 fotos caben holgadas en el límite de 1 MB del documento.
-- **Topes:** máximo **20 fotos subidas** (las reglas lo hacen cumplir) y máximo **20 entre especialidades y paquetes/promos** (lo controla el panel). Al llegar al tope se pide borrar alguna; borrar un producto o quitarle la foto libera el espacio. Los adicionales (calzones, bebidas…) no cuentan en el segundo tope.
-- **Cuota gratuita:** la tienda lee el menú con una máscara (sin las fotos) y descarga las fotos solo cuando cambia su versión (`fotosVersion`); el resto de las visitas usa la copia guardada en el dispositivo. El carrito guarda solo la clave de la foto (`sub:ID`).
+## Configurar Firebase (una sola vez)
 
-## Pedidos: cancelar, no borrar
+1. **Authentication → Método de acceso:** activar *Correo electrónico/contraseña* y *Google*. En *Dominios autorizados* debe estar el dominio de la tienda.
+2. **Primer administrador:** en *Authentication → Usuarios → Agregar usuario* crear `TELEFONO@admin.anonimus.pizza` con su contraseña y copiar el **UID**. En *Firestore → colección `admins`* crear el documento con ese UID y el campo `nombre` (un perfil sin `rol` cuenta como admin).
+3. **Los demás usuarios** se registran desde el panel → **Usuarios** (nombre, teléfono, contraseña y perfil). Para cambiar la contraseña de alguien: borrarlo en Authentication y registrarlo de nuevo.
+4. La configuración web de Firebase (`src/firebase/claves.js`) es pública por diseño; **nunca** se guardan llaves privadas, contraseñas ni datos personales en el repositorio.
 
-Los pedidos **no se pueden borrar** (ni desde el panel ni por las reglas): se **cancelan** (con confirmación y fecha de cancelación). Un pedido cancelado **no cuenta en las ventas**. La pestaña **Resumen** muestra, por periodo (hoy, 7 días, 30 días o todos): pedidos recibidos, vendidos (sin cancelados), entregados, en proceso, cancelados, ventas, monto cancelado, ticket promedio y porcentaje de cancelados, además de una gráfica de 7 días con los cancelados de cada día y lo más vendido.
+## Datos (Firestore)
 
-## Sesiones separadas: panel de administración y clientes
+| Colección / documento | Contenido | Quién escribe |
+|---|---|---|
+| `pedidos/{id}` | pedido: datos de entrega, `items`, `total`, `estado`, `uid` opcional | cualquiera crea; personal actualiza según perfil; **nadie borra** |
+| `admins/{uid}` | `nombre`, `telefono`, `rol` (`admin`/`tienda`/`empleado`), `activo` | admin |
+| `config/menu` | `items[]` (todo el menú) y `fotosVersion` | admin / tienda |
+| `config/fotos` | `fotos` (id → imagen WebP en data URL) y `version` | admin / tienda |
 
-El panel (`/admin`) usa **su propia instancia de Firebase** (`src/firebase/admin.js`, app "admin"), con su sesión guardada aparte, independiente de la de los clientes (`src/firebase/auth.js`). Entrar o salir en uno no afecta al otro. Las cuentas internas del panel (`@admin.anonimus.pizza`) no pueden entrar ni registrarse como clientes, y el panel muestra la cuenta conectada en la cabecera.
+- `config/*` es de lectura pública. Un cliente solo lee **sus** pedidos (consulta por `uid`, sin índices); un pedido sin dueño puede ser reclamado una sola vez por una cuenta.
+- **Pedidos cancelados** no cuentan en las ventas.
+
+## Fotos y topes
+
+Firebase Storage exige plan de pago, así que las fotos se guardan **dentro de Firestore**: se recortan cuadradas y se comprimen en el navegador (≈30 KB, WebP).
+
+- Máximo **20 fotos subidas** (lo exigen las reglas) y **20 entre especialidades y paquetes** (lo controla el panel). Al llegar al tope se pide borrar alguna.
+- La tienda descarga las fotos solo cuando cambia `fotosVersion`; el resto de las visitas usa la copia local, para cuidar la cuota gratuita (50 000 lecturas/día en Firestore).
+- Sin foto, cada producto muestra un **ícono** elegido en el panel (pizza, calzone, refresco, etc.).
+
+## Despliegue
+
+Cada push a `main` ejecuta `.github/workflows/firebase-hosting.yml`: instala, compila y publica **Hosting** y las **reglas de Firestore** en el proyecto `anonimus-pizza`.
+
+- Autenticación **sin llaves**: Workload Identity Federation. Se configuran dos variables del repositorio (*Settings → Secrets and variables → Actions → Variables*): `GCP_WIF_PROVIDER` y `GCP_SERVICE_ACCOUNT`.
+- Si el despliegue falla con "Failed to authenticate", revisa que la cuenta de servicio tenga sus roles y el enlace `workloadIdentityUser`, y vuelve a lanzar el workflow.
+- Flujo de trabajo: rama de trabajo → Pull Request → squash merge a `main` → comprobar que la acción de despliegue termine en verde.
+
+## Herramientas
+
+`tools/procesar-imagenes.py` (necesita Pillow y numpy) genera la base de pizza y los atlas de sprites de ingredientes a partir de las imágenes originales de la app de Android; el resultado ya está en `public/img/`.
+
+## Límites conocidos
+
+- Verificado con emulador y pruebas automáticas; el acceso con Google de clientes, la subida de fotos con la cámara de un teléfono real y el bloqueo de zoom en iOS Safari conviene probarlos en el proyecto real.
+- Revisa en la consola de Firebase los límites vigentes de Authentication y la cuota de Firestore de tu plan.
