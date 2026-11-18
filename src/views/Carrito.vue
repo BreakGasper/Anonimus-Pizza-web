@@ -1,13 +1,44 @@
 <script setup>
-import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { reactive, ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { items, total, cambiar, quitar, vaciar, ultimoPedido } from '../store/cart.js'
 import { crearPedido } from '../firebase/pedidos.js'
 import { money } from '../data/menu.js'
 import Icono from '../components/Icono.vue'
 
+const route = useRoute()
 const router = useRouter()
+
+/* ---------- Pasos: 1) carrito  2) datos de entrega ---------- */
+const paso = computed(() => (route.query.paso === 'datos' && items.value.length ? 2 : 1))
+const continuar = () => router.push({ path: '/carrito', query: { paso: 'datos' } })
+const volver = () => router.push({ path: '/carrito' })
+
+/* ---------- Datos del cliente: se guardan solo en este dispositivo ---------- */
+const CLAVE = 'anonimus-datos-cliente'
 const f = reactive({ nombre: '', telefono: '', calle: '', referencia: '', localidad: '', notas: '' })
+const guardados = ref(false) // ¿hay datos de una compra anterior?
+function leerGuardados() {
+  try { return JSON.parse(localStorage.getItem(CLAVE)) || null } catch { return null }
+}
+onMounted(() => {
+  const d = leerGuardados()
+  if (d) {
+    for (const k of ['nombre', 'telefono', 'calle', 'referencia', 'localidad']) if (typeof d[k] === 'string') f[k] = d[k]
+    guardados.value = Object.values(d).some((v) => v)
+  }
+})
+// Se guardan mientras escribe (y al confirmar). Las notas son de cada pedido, así que no se guardan.
+watch(() => [f.nombre, f.telefono, f.calle, f.referencia, f.localidad], () => {
+  try { localStorage.setItem(CLAVE, JSON.stringify({ nombre: f.nombre, telefono: f.telefono, calle: f.calle, referencia: f.referencia, localidad: f.localidad })) } catch { /* sin almacenamiento */ }
+})
+function olvidarDatos() {
+  try { localStorage.removeItem(CLAVE) } catch { /* sin almacenamiento */ }
+  for (const k of ['nombre', 'telefono', 'calle', 'referencia', 'localidad', 'notas']) f[k] = ''
+  guardados.value = false
+}
+
+/* ---------- Enviar pedido ---------- */
 const error = ref('')
 const enviando = ref(false)
 
@@ -50,56 +81,86 @@ async function confirmar() {
     <router-link to="/especialidades" class="btn">Ver el menú</router-link>
   </div>
 
-  <div v-else class="carrito-grid">
-   <section>
-    <article v-for="i in items" :key="i.clave" class="tarjeta">
-      <div class="fila">
-        <div class="item-foto" aria-hidden="true">
-          <img v-if="i.foto" :src="i.foto" alt="" width="72" height="72" decoding="async" />
-          <span v-else>{{ i.emoji || '🍕' }}</span>
-        </div>
-        <div class="grow">
-          <b>{{ i.nombre }}</b>
-          <p v-if="i.detalle" class="desc">{{ i.detalle }}</p>
-          <div class="cant" style="margin-top:8px">
-            <button type="button" class="menos" aria-label="Quitar uno" @click="cambiar(i.clave, -1)"><Icono nombre="menos" :tam="18" /></button>
-            <b>{{ i.cantidad }}</b>
-            <button type="button" class="mas" aria-label="Agregar uno" @click="cambiar(i.clave, 1)"><Icono nombre="mas" :tam="18" /></button>
-            <button type="button" class="basura" :aria-label="'Quitar ' + i.nombre + ' del carrito'" title="Quitar del carrito" @click="quitar(i.clave)"><Icono nombre="basura" :tam="20" /></button>
+  <template v-else>
+    <ol class="pasos-cab" aria-label="Pasos del pedido">
+      <li :class="{ on: paso === 1, hecho: paso > 1 }"><i>1</i> Carrito</li>
+      <li class="linea" aria-hidden="true"></li>
+      <li :class="{ on: paso === 2 }"><i>2</i> Entrega</li>
+    </ol>
+
+    <!-- Paso 1: carrito -->
+    <section v-if="paso === 1" class="paso-carrito">
+      <article v-for="i in items" :key="i.clave" class="tarjeta">
+        <div class="fila">
+          <div class="item-foto" aria-hidden="true">
+            <img v-if="i.foto" :src="i.foto" alt="" width="72" height="72" decoding="async" />
+            <span v-else>{{ i.emoji || '🍕' }}</span>
           </div>
+          <div class="grow">
+            <b>{{ i.nombre }}</b>
+            <p v-if="i.detalle" class="desc">{{ i.detalle }}</p>
+            <div class="cant" style="margin-top:8px">
+              <button type="button" class="menos" aria-label="Quitar uno" @click="cambiar(i.clave, -1)"><Icono nombre="menos" :tam="18" /></button>
+              <b>{{ i.cantidad }}</b>
+              <button type="button" class="mas" aria-label="Agregar uno" @click="cambiar(i.clave, 1)"><Icono nombre="mas" :tam="18" /></button>
+              <button type="button" class="basura" :aria-label="'Quitar ' + i.nombre + ' del carrito'" title="Quitar del carrito" @click="quitar(i.clave)"><Icono nombre="basura" :tam="20" /></button>
+            </div>
+          </div>
+          <div class="precio">{{ money(i.precio * i.cantidad) }}</div>
         </div>
-        <div class="precio">{{ money(i.precio * i.cantidad) }}</div>
-      </div>
-    </article>
+      </article>
 
-    <div class="total"><span>Total</span><span>{{ money(total) }}</span></div>
-   </section>
+      <div class="total"><span>Total</span><span>{{ money(total) }}</span></div>
+      <button type="button" class="btn block" @click="continuar">Continuar · {{ money(total) }}</button>
+      <router-link to="/especialidades" class="seguir">+ Seguir agregando productos</router-link>
+    </section>
 
-   <section>
-    <h2 style="margin:0 0 10px">¿Dónde la llevamos?</h2>
-    <form @submit.prevent="confirmar" novalidate>
-      <label class="campo">Nombre
-        <input v-model="f.nombre" maxlength="80" autocomplete="name" />
-      </label>
-      <label class="campo">Celular (10 dígitos)
-        <input v-model="f.telefono" type="tel" inputmode="numeric" maxlength="14" autocomplete="tel" />
-      </label>
-      <label class="campo">Calle y número
-        <input v-model="f.calle" maxlength="90" autocomplete="street-address" />
-      </label>
-      <label class="campo">Referencia del lugar (opcional)
-        <input v-model="f.referencia" maxlength="50" placeholder="Ej. Casa verde, puerta negra" />
-      </label>
-      <label class="campo">Localidad
-        <input v-model="f.localidad" maxlength="40" />
-      </label>
-      <label class="campo">Notas para tu pedido (opcional)
-        <textarea v-model="f.notas" rows="2" maxlength="300"></textarea>
-      </label>
-      <p class="aviso">Pagas en efectivo al recibir tu pedido.</p>
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <button class="btn block" :disabled="enviando">{{ enviando ? 'Enviando…' : 'Confirmar pedido · ' + money(total) }}</button>
-    </form>
-   </section>
-  </div>
+    <!-- Paso 2: datos de entrega -->
+    <div v-else class="carrito-grid">
+      <section class="entrega">
+        <h2 style="margin:0 0 6px">¿Dónde la llevamos?</h2>
+        <div v-if="guardados" class="guardados" role="status">
+          <span>✔ Usamos los datos de tu compra anterior.</span>
+          <button type="button" class="enlace-btn" @click="olvidarDatos">Borrar mis datos</button>
+        </div>
+        <form @submit.prevent="confirmar" novalidate>
+          <label class="campo">Nombre
+            <input v-model="f.nombre" maxlength="80" autocomplete="name" />
+          </label>
+          <label class="campo">Celular (10 dígitos)
+            <input v-model="f.telefono" type="tel" inputmode="numeric" maxlength="14" autocomplete="tel" />
+          </label>
+          <label class="campo">Calle y número
+            <input v-model="f.calle" maxlength="90" autocomplete="street-address" />
+          </label>
+          <label class="campo">Referencia del lugar (opcional)
+            <input v-model="f.referencia" maxlength="50" placeholder="Ej. Casa verde, puerta negra" />
+          </label>
+          <label class="campo">Localidad
+            <input v-model="f.localidad" maxlength="40" />
+          </label>
+          <label class="campo">Notas para tu pedido (opcional)
+            <textarea v-model="f.notas" rows="2" maxlength="300"></textarea>
+          </label>
+          <p class="aviso">Pagas en efectivo al recibir tu pedido.</p>
+          <p class="privado">Tus datos se guardan solo en este dispositivo para tu próxima compra.</p>
+          <p v-if="error" class="error" role="alert">{{ error }}</p>
+          <button class="btn block" :disabled="enviando">{{ enviando ? 'Enviando…' : 'Confirmar pedido · ' + money(total) }}</button>
+          <button type="button" class="btn block claro" style="margin-top:10px" @click="volver">← Volver al carrito</button>
+        </form>
+      </section>
+
+      <aside class="resumen-pedido" aria-label="Resumen de tu pedido">
+        <h3>Tu pedido</h3>
+        <ul>
+          <li v-for="i in items" :key="i.clave">
+            <span class="mini" aria-hidden="true"><img v-if="i.foto" :src="i.foto" alt="" width="40" height="40" /><span v-else>{{ i.emoji || '🍕' }}</span></span>
+            <span class="grow">{{ i.cantidad }} × {{ i.nombre }}</span>
+            <b>{{ money(i.precio * i.cantidad) }}</b>
+          </li>
+        </ul>
+        <div class="total"><span>Total</span><span>{{ money(total) }}</span></div>
+      </aside>
+    </div>
+  </template>
 </template>

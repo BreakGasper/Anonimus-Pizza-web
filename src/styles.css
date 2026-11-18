@@ -165,7 +165,7 @@ label.campo { display: block; margin-bottom: 12px; font-weight: 600; font-size: 
   .carrusel { overflow: visible; flex-wrap: wrap; margin: 0; padding: 0; }
   .fav { width: calc(25% - 9px); }
   .prod:hover { transform: translateY(-2px); }
-  .carrito-grid { grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  .carrito-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; align-items: start; }
 }
 @media (min-width: 960px) {
   .hero { grid-template-columns: 1.1fr .9fr; text-align: left; padding: 44px; align-items: center; }
@@ -192,3 +192,27 @@ label.campo { display: block; margin-bottom: 12px; font-weight: 600; font-size: 
 .item-foto { width: 72px; height: 72px; flex: none; border-radius: 50%; background: var(--sup2); display: grid; place-items: center; font-size: 2.2rem; overflow: hidden; align-self: flex-start; }
 .item-foto img { width: 100%; height: 100%; object-fit: cover; filter: drop-shadow(0 4px 6px #0008); }
 @media (min-width: 720px) { .item-foto { width: 84px; height: 84px; } }
+
+/* ---------- Carrito en pasos ---------- */
+.pasos-cab { display: flex; align-items: center; gap: 10px; list-style: none; padding: 0; margin: 4px 0 16px; color: var(--suave); font-weight: 600; font-size: .92rem; }
+.pasos-cab li { display: inline-flex; align-items: center; gap: 8px; }
+.pasos-cab i { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 800 1rem var(--display); font-style: normal; background: var(--sup2); border: 1px solid var(--borde); }
+.pasos-cab .on { color: var(--texto); } .pasos-cab .on i { background: var(--rojo); border-color: var(--rojo); color: #fff; }
+.pasos-cab .hecho i { background: var(--verde); border-color: var(--verde); color: #fff; }
+.pasos-cab .linea { flex: 1; height: 2px; background: var(--borde); max-width: 120px; }
+.paso-carrito { max-width: 720px; }
+.seguir { display: block; text-align: center; margin-top: 14px; color: var(--ambar); font-weight: 600; }
+.guardados { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; background: #12331f; border: 1px solid #1f6b3b; color: #b9efcd; border-radius: 12px; padding: 10px 12px; font-size: .9rem; margin: 8px 0 14px; }
+.enlace-btn { background: none; border: 0; color: #ffd48a; text-decoration: underline; font-weight: 600; padding: 4px; }
+.privado { color: var(--suave); font-size: .8rem; margin: 6px 0 10px; }
+.resumen-pedido { background: var(--sup); border: 1px solid var(--borde); border-radius: var(--radio); padding: 16px; order: -1; margin-bottom: 14px; }
+.resumen-pedido h3 { margin-bottom: 8px; }
+.resumen-pedido ul { list-style: none; padding: 0; margin: 0; }
+.resumen-pedido li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--borde); font-size: .92rem; }
+.resumen-pedido li .grow { flex: 1; min-width: 0; }
+.resumen-pedido .mini { width: 40px; height: 40px; flex: none; border-radius: 50%; background: var(--sup2); display: grid; place-items: center; overflow: hidden; font-size: 1.3rem; }
+.resumen-pedido .mini img { width: 100%; height: 100%; object-fit: cover; }
+.resumen-pedido .total { font-size: 1.4rem; margin-top: 8px; }
+@media (min-width: 720px) {
+  .resumen-pedido { order: 0; margin-bottom: 0; position: sticky; top: calc(var(--cab-h) + 16px); }
+}
