@@ -44,15 +44,26 @@ service cloud.firestore {
                     && request.resource.data.creado == request.time;
       allow read: if esAdmin()
                   || (request.auth != null && 'uid' in resource.data && resource.data.uid == request.auth.uid);
-      allow update, delete: if esAdmin();
+      // Los pedidos no se borran (la contabilidad no se puede alterar): se cancelan cambiando su estado.
+      allow update: if esAdmin();
+      allow delete: if false;
     }
 
-    // Menú de la tienda (un solo documento: config/menu). Lo lee cualquiera; solo un admin lo cambia.
+    // Contenido público de la tienda (colección config): se lee sin sesión.
     match /config/{documento} {
       allow read: if true;
+    }
+    // Menú (un solo documento con todos los productos). Solo lo cambia un admin.
+    match /config/menu {
       allow write: if esAdmin()
                    && request.resource.data.items is list
                    && request.resource.data.items.size() <= 150;
+    }
+    // Fotos subidas desde el panel (texto base64 dentro de un solo documento). Tope: 20 fotos.
+    match /config/fotos {
+      allow write: if esAdmin()
+                   && request.resource.data.fotos is map
+                   && request.resource.data.fotos.size() <= 20;
     }
 
     // Todo lo demás, cerrado.

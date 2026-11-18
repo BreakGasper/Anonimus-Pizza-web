@@ -6,6 +6,7 @@ import { crearPedido } from '../firebase/pedidos.js'
 import { guardarEnHistorial } from '../store/historial.js'
 import { money } from '../data/menu.js'
 import Icono from '../components/Icono.vue'
+import { resolverFoto } from '../store/menu.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -95,7 +96,7 @@ async function confirmar() {
       <article v-for="i in items" :key="i.clave" class="tarjeta">
         <div class="fila">
           <div class="item-foto" aria-hidden="true">
-            <img v-if="i.foto" :src="i.foto" alt="" width="72" height="72" decoding="async" />
+            <img v-if="resolverFoto(i.foto)" :src="resolverFoto(i.foto)" alt="" width="72" height="72" decoding="async" />
             <span v-else>{{ i.emoji || '🍕' }}</span>
           </div>
           <div class="grow">
@@ -156,7 +157,7 @@ async function confirmar() {
         <h3>Tu pedido</h3>
         <ul>
           <li v-for="i in items" :key="i.clave">
-            <span class="mini" aria-hidden="true"><img v-if="i.foto" :src="i.foto" alt="" width="40" height="40" /><span v-else>{{ i.emoji || '🍕' }}</span></span>
+            <span class="mini" aria-hidden="true"><img v-if="resolverFoto(i.foto)" :src="resolverFoto(i.foto)" alt="" width="40" height="40" /><span v-else>{{ i.emoji || '🍕' }}</span></span>
             <span class="grow">{{ i.cantidad }} × {{ i.nombre }}</span>
             <b>{{ money(i.precio * i.cantidad) }}</b>
           </li>

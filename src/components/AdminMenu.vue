@@ -1,9 +1,10 @@
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick } from 'vue'
-import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, onSnapshot, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore'
 import { db } from '../firebase/db.js'
 import { MENU_INICIAL, ARMA, money, TITULOS_CATEGORIA } from '../data/menu.js'
-import { normalizar, FOTOS_BIBLIOTECA, fotoDe, hayPromo, precioFinal } from '../store/menu.js'
+import { normalizar, FOTOS_BIBLIOTECA, fotoDe, hayPromo, precioFinal, fotosSubidas } from '../store/menu.js'
+import { prepararFoto, ErrorFoto } from '../utils/imagen.js'
 
 const items = ref([])
 const guardado = ref(false) // ¿ya existe el menú en Firestore? (si no, se muestra el inicial)
@@ -11,7 +12,12 @@ const cargando = ref(true)
 const error = ref('')
 const aviso = ref('')
 const filtro = ref('todos')
-let cortar = null, tAviso
+let cortar = null, cortarFotos = null, tAviso
+
+// Topes: 20 fotos subidas, y 20 entre especialidades y paquetes/promos (para borrar alguno antes de agregar más).
+const MAX_FOTOS = 20
+const MAX_PRINCIPALES = 20
+const esPrincipal = (tipo) => tipo === 'especialidad' || tipo === 'paquete'
 
 const TIPOS = { especialidad: 'Especialidad', paquete: 'Paquete', adicional: 'Adicional' }
 const TODOS_INGREDIENTES = [...ARMA.verduras, ...ARMA.carnes]
@@ -22,24 +28,42 @@ onMounted(() => {
     else { items.value = MENU_INICIAL.map(normalizar); guardado.value = false }
     cargando.value = false
   }, () => { error.value = 'No se pudo cargar el menú.'; cargando.value = false })
+  cortarFotos = onSnapshot(doc(db, 'config', 'fotos'), (s) => { fotosSubidas.value = s.exists() ? (s.data().fotos || {}) : {} })
 })
-onUnmounted(() => cortar?.())
+onUnmounted(() => { cortar?.(); cortarFotos?.() })
+const fotosUsadas = computed(() => Object.keys(fotosSubidas.value).length)
+const principales = computed(() => items.value.filter((i) => esPrincipal(i.tipo)).length)
+const nuevoIdFoto = () => `f${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`
 
 function avisar(t) { aviso.value = t; clearTimeout(tAviso); tAviso = setTimeout(() => (aviso.value = ''), 2500) }
 
-/* ---------- Guardar (un documento con todo el menú) ---------- */
-async function guardar(nuevos, mensaje) {
-  const previo = items.value
+/* ---------- Guardar (el menú y, si cambian, las fotos, en un solo lote) ---------- */
+// cambiosFotos: { idFoto: 'data:…' (agregar o reemplazar) | null (borrar) }  ·  { todas: true } borra todas las fotos.
+async function guardar(nuevos, mensaje, cambiosFotos = null) {
+  const previo = items.value, fotosPrevias = fotosSubidas.value
   items.value = nuevos
   error.value = ''
   try {
-    await setDoc(doc(db, 'config', 'menu'), { items: nuevos.map((i) => ({ ...i })), actualizado: serverTimestamp() })
+    const lote = writeBatch(db)
+    const datos = { items: nuevos.map((i) => ({ ...i })), actualizado: serverTimestamp() }
+    if (cambiosFotos) {
+      const version = Date.now()
+      datos.fotosVersion = version // la tienda descarga las fotos solo cuando cambia este número
+      const refFotos = doc(db, 'config', 'fotos')
+      if (cambiosFotos.todas) lote.set(refFotos, { fotos: {}, version })
+      else lote.set(refFotos, { fotos: Object.fromEntries(Object.entries(cambiosFotos).map(([k, v]) => [k, v === null ? deleteField() : v])), version }, { merge: true })
+      const siguiente = cambiosFotos.todas ? {} : { ...fotosSubidas.value }
+      if (!cambiosFotos.todas) for (const [k, v] of Object.entries(cambiosFotos)) { if (v === null) delete siguiente[k]; else siguiente[k] = v }
+      fotosSubidas.value = siguiente
+    }
+    lote.set(doc(db, 'config', 'menu'), datos, { merge: true }) // merge: conserva fotosVersion cuando solo cambian los productos
+    await lote.commit()
     guardado.value = true
     if (mensaje) avisar(mensaje)
     return true
   } catch (e) {
-    items.value = previo
-    error.value = e.code === 'permission-denied' ? 'Esta cuenta no tiene permiso para cambiar el menú.' : 'No se pudo guardar. Revisa tu conexión.'
+    items.value = previo; fotosSubidas.value = fotosPrevias
+    error.value = e.code === 'permission-denied' ? 'Esta cuenta no tiene permiso para cambiar el menú (o se superó el tope de 20 fotos).' : 'No se pudo guardar. Revisa tu conexión.'
     return false
   }
 }
@@ -77,12 +101,27 @@ function mover(it, dir) {
   guardar(arr)
 }
 const puedeMover = (it, dir) => { const arr = items.value; let j = arr.findIndex((x) => x.id === it.id) + dir; while (j >= 0 && j < arr.length && arr[j].tipo !== it.tipo) j += dir; return j >= 0 && j < arr.length }
-function duplicar(it) { guardar([...items.value, { ...it, id: nuevoId(it.tipo), nombre: (it.nombre + ' (copia)').slice(0, 60), activo: false, ingredientes: [...it.ingredientes] }], 'Copia creada (oculta). Edítala y muéstrala cuando esté lista.') }
-function borrar(it) { if (confirm(`¿Borrar “${it.nombre}” del menú? No se puede deshacer.`)) guardar(items.value.filter((x) => x.id !== it.id), 'Producto borrado') }
-function restablecer() {
-  if (!confirm('¿Restablecer el menú inicial? Se perderán todos tus cambios del menú (productos, precios, promociones y favoritas).')) return
-  guardar(MENU_INICIAL.map(normalizar), 'Menú inicial restablecido')
+function duplicar(it) {
+  if (esPrincipal(it.tipo) && principales.value >= MAX_PRINCIPALES) { error.value = limitePrincipales(); return }
+  const copia = { ...it, id: nuevoId(it.tipo), nombre: (it.nombre + ' (copia)').slice(0, 60), activo: false, ingredientes: [...it.ingredientes] }
+  let cambios = null, extra = ''
+  if (it.foto.startsWith('sub:')) { // la copia lleva su propia foto (así borrar una no quita la otra) si queda espacio
+    const idViejo = it.foto.slice(4), dato = fotosSubidas.value[idViejo]
+    if (dato && fotosUsadas.value < MAX_FOTOS) { const nid = nuevoIdFoto(); cambios = { [nid]: dato }; copia.foto = 'sub:' + nid }
+    else { copia.foto = ''; extra = ' Sin foto: ya tienes 20 fotos subidas.' }
+  }
+  guardar([...items.value, copia], 'Copia creada (oculta). Edítala y muéstrala cuando esté lista.' + extra, cambios)
 }
+function borrar(it) {
+  if (!confirm(`¿Borrar “${it.nombre}” del menú? No se puede deshacer.`)) return
+  guardar(items.value.filter((x) => x.id !== it.id), 'Producto borrado' + (it.foto.startsWith('sub:') ? ' (y se liberó una foto)' : ''), it.foto.startsWith('sub:') ? { [it.foto.slice(4)]: null } : null)
+}
+function restablecer() {
+  if (!confirm('¿Restablecer el menú inicial? Se perderán todos tus cambios del menú (productos, precios, promociones y favoritas) y las fotos que subiste.')) return
+  guardar(MENU_INICIAL.map(normalizar), 'Menú inicial restablecido', { todas: true })
+}
+const limitePrincipales = () => `Llegaste al límite: ya tienes ${MAX_PRINCIPALES} entre especialidades y paquetes/promos. Borra alguno para poder agregar otro.`
+const limiteFotos = () => `Llegaste al límite de ${MAX_FOTOS} fotos subidas. Borra la foto de otro producto (o el producto) para poder subir otra.`
 const nuevoId = (tipo) => `${tipo.slice(0, 3)}-${Date.now().toString(36)}${Math.floor(Math.random() * 36).toString(36)}`
 
 /* ---------- Editor ---------- */
@@ -90,19 +129,42 @@ const ed = ref(null)
 const errEd = ref('')
 const refNombre = ref(null)
 const modoFoto = ref('ninguna')
+const procesando = ref(false)
+const errFoto = ref('')
 
 function abrir(it) {
   errEd.value = ''
   const base = it ? { ...it, ingredientes: [...it.ingredientes] } : normalizar({ tipo: ['especialidad', 'paquete', 'adicional'].includes(filtro.value) ? filtro.value : 'especialidad', categoria: 'calzones', precio: '', activo: true })
   base.precio = it ? it.precio : ''
   base.precioPromo = it?.precioPromo ?? ''
-  ed.value = reactive({ ...base, esNuevo: !it })
-  modoFoto.value = !base.foto ? 'ninguna' : base.foto.startsWith('lib:') ? 'biblioteca' : 'url'
+  ed.value = reactive({ ...base, esNuevo: !it, fotoNueva: '', fotoOriginal: base.foto })
+  errFoto.value = ''
+  modoFoto.value = !base.foto ? 'ninguna' : base.foto.startsWith('lib:') ? 'biblioteca' : base.foto.startsWith('sub:') ? 'subida' : 'url'
   nextTick(() => refNombre.value?.focus())
 }
 function cerrar() { ed.value = null }
 function alternarIngrediente(n) { const a = ed.value.ingredientes; const i = a.indexOf(n); if (i >= 0) a.splice(i, 1); else a.push(n) }
-function elegirModoFoto(m) { modoFoto.value = m; if (m === 'ninguna') ed.value.foto = ''; if (m === 'biblioteca' && !ed.value.foto.startsWith('lib:')) ed.value.foto = ''; if (m === 'url' && ed.value.foto.startsWith('lib:')) ed.value.foto = '' }
+function elegirModoFoto(m) {
+  modoFoto.value = m; errFoto.value = ''
+  const f = ed.value.foto
+  if (m === 'ninguna') { ed.value.foto = ''; ed.value.fotoNueva = '' }
+  if (m === 'biblioteca' && !f.startsWith('lib:')) ed.value.foto = ''
+  if (m === 'url' && (f.startsWith('lib:') || f.startsWith('sub:'))) ed.value.foto = ''
+  if (m === 'subida') ed.value.foto = ed.value.fotoOriginal.startsWith('sub:') ? ed.value.fotoOriginal : ''
+}
+const previa = computed(() => { const e = ed.value; if (!e) return null; return e.fotoNueva || (e.foto?.startsWith('sub:') ? fotosSubidas.value[e.foto.slice(4)] : null) || null })
+async function alElegirArchivo(ev) {
+  const archivo = ev.target.files?.[0]
+  ev.target.value = '' // permite volver a elegir el mismo archivo
+  if (!archivo) return
+  errFoto.value = ''; procesando.value = true
+  try { ed.value.fotoNueva = await prepararFoto(archivo) }
+  catch (e) {
+    const c = e instanceof ErrorFoto ? e.codigo : ''
+    errFoto.value = c === 'tipo' ? 'Elige una imagen (JPG, PNG o WebP).' : c === 'grande' ? 'La imagen pesa demasiado (máximo 12 MB).' : c === 'pesada' ? 'No se pudo reducir esa imagen lo suficiente. Prueba con otra.' : 'No se pudo leer la imagen.'
+  } finally { procesando.value = false }
+}
+function quitarFoto() { ed.value.fotoNueva = ''; ed.value.foto = ''; modoFoto.value = 'ninguna' }
 
 function validar(e) {
   if (!e.nombre.trim()) return 'Escribe el nombre.'
@@ -117,19 +179,32 @@ function validar(e) {
   }
   if (modoFoto.value === 'url' && e.foto && !/^https:\/\/\S+$/i.test(e.foto.trim())) return 'La dirección de la imagen debe empezar con https://'
   if (modoFoto.value === 'biblioteca' && !e.foto) return 'Elige una foto de la biblioteca o cambia a “Sin foto”.'
+  if (modoFoto.value === 'subida' && !previa.value) return 'Elige una foto de tu dispositivo o cambia a “Sin foto”.'
+  const vienePrincipal = esPrincipal(e.tipo) && (e.esNuevo || !esPrincipal(items.value.find((x) => x.id === e.id)?.tipo))
+  if (vienePrincipal && principales.value >= MAX_PRINCIPALES) return limitePrincipales()
+  if (modoFoto.value === 'subida' && e.fotoNueva && !e.foto.startsWith('sub:') && fotosUsadas.value >= MAX_FOTOS) return limiteFotos()
   return ''
 }
 async function guardarEd() {
   errEd.value = validar(ed.value)
   if (errEd.value) return
   const e = ed.value
+  const idViejo = e.fotoOriginal.startsWith('sub:') ? e.fotoOriginal.slice(4) : null
+  let fotoFinal = '', cambios = null
+  if (modoFoto.value === 'subida') {
+    if (e.fotoNueva) { const id = idViejo || nuevoIdFoto(); cambios = { [id]: e.fotoNueva }; fotoFinal = 'sub:' + id } // nueva o reemplazo
+    else fotoFinal = e.foto // la que ya tenía, sin cambios
+  } else {
+    fotoFinal = modoFoto.value === 'ninguna' ? '' : e.foto.trim()
+    if (idViejo) cambios = { [idViejo]: null } // dejó de usar su foto subida: se libera el espacio
+  }
   const item = normalizar({
     ...e, nombre: e.nombre.trim(), desc: e.desc.trim(), precio: Number(e.precio), precioPromo: e.enPromo ? Number(e.precioPromo) : (e.precioPromo === '' ? null : Number(e.precioPromo) || null),
-    emoji: e.emoji.trim(), foto: modoFoto.value === 'ninguna' ? '' : e.foto.trim(), categoria: e.tipo === 'adicional' ? e.categoria : '',
+    emoji: e.emoji.trim(), foto: fotoFinal, categoria: e.tipo === 'adicional' ? e.categoria : '',
     ingredientes: e.tipo === 'especialidad' ? e.ingredientes : [], id: e.esNuevo ? nuevoId(e.tipo) : e.id,
   })
   const nuevos = e.esNuevo ? [...items.value, item] : items.value.map((x) => (x.id === item.id ? item : x))
-  if (await guardar(nuevos, e.esNuevo ? `“${item.nombre}” agregado al menú` : 'Cambios guardados')) cerrar()
+  if (await guardar(nuevos, e.esNuevo ? `“${item.nombre}” agregado al menú` : 'Cambios guardados', cambios)) cerrar()
   else errEd.value = error.value
 }
 const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) return 0; const p = Number(e.precio), pp = Number(e.precioPromo); return p > 0 && pp > 0 && pp < p ? Math.round((1 - pp / p) * 100) : 0 })
@@ -144,6 +219,10 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
 
     <p v-if="cargando" class="sub">Cargando menú…</p>
     <template v-else>
+      <div class="topes" role="status">
+        <span :class="{ lleno: principales >= MAX_PRINCIPALES }">Especialidades y paquetes: <b>{{ principales }}</b> de {{ MAX_PRINCIPALES }}</span>
+        <span :class="{ lleno: fotosUsadas >= MAX_FOTOS }">Fotos subidas: <b>{{ fotosUsadas }}</b> de {{ MAX_FOTOS }}</span>
+      </div>
       <div v-if="!guardado" class="aviso" role="status">Estás viendo el <b>menú inicial</b>. Se guardará en tu base de datos cuando hagas el primer cambio.</div>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div v-if="aviso" class="adm-aviso" role="status">{{ aviso }}</div>
@@ -195,6 +274,7 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
             <select v-model="ed.categoria"><option value="calzones">Calzones</option><option value="bebidas">Bebidas</option><option value="otros">Otros</option></select>
           </label>
         </div>
+        <p v-if="ed.esNuevo && esPrincipal(ed.tipo) && principales >= MAX_PRINCIPALES" class="error" role="alert">{{ limitePrincipales() }}</p>
         <label class="campo">Nombre
           <input ref="refNombre" v-model="ed.nombre" maxlength="60" placeholder="Ej. Pizza Hawaiana" />
         </label>
@@ -229,8 +309,19 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
           <legend>Foto</legend>
           <div class="modos">
             <label class="check"><input type="radio" value="ninguna" :checked="modoFoto === 'ninguna'" @change="elegirModoFoto('ninguna')" /> Sin foto</label>
+            <label class="check"><input type="radio" value="subida" :checked="modoFoto === 'subida'" @change="elegirModoFoto('subida')" /> Subir mi foto</label>
             <label class="check"><input type="radio" value="biblioteca" :checked="modoFoto === 'biblioteca'" @change="elegirModoFoto('biblioteca')" /> De la biblioteca</label>
             <label class="check"><input type="radio" value="url" :checked="modoFoto === 'url'" @change="elegirModoFoto('url')" /> Dirección de imagen</label>
+          </div>
+          <div v-if="modoFoto === 'subida'" class="subida">
+            <div class="previa" aria-hidden="true"><img v-if="previa" :src="previa" alt="" width="96" height="96" /><span v-else>📷</span></div>
+            <div class="subida-acciones">
+              <label class="btn chico claro archivo">{{ previa ? 'Cambiar foto' : 'Elegir foto' }}<input type="file" accept="image/*" hidden @change="alElegirArchivo" /></label>
+              <button v-if="previa" type="button" class="btn chico claro" @click="quitarFoto">Quitar foto</button>
+              <span v-if="procesando" class="desc">Preparando la foto…</span>
+            </div>
+            <p class="desc" style="flex-basis:100%">Se recorta cuadrada y se reduce (≈30 KB) para guardarse gratis en tu base de datos. Fotos subidas: <b>{{ fotosUsadas }}</b> de {{ MAX_FOTOS }}.</p>
+            <p v-if="errFoto" class="error" role="alert" style="flex-basis:100%">{{ errFoto }}</p>
           </div>
           <div v-if="modoFoto === 'biblioteca'" class="biblio">
             <button v-for="f in FOTOS_BIBLIOTECA" :key="f.clave" type="button" :class="['bib', { on: ed.foto === 'lib:' + f.clave }]" :aria-pressed="ed.foto === 'lib:' + f.clave" @click="ed.foto = 'lib:' + f.clave">
@@ -240,7 +331,7 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
           <label v-if="modoFoto === 'url'" class="campo">Dirección (https://…)
             <input v-model="ed.foto" type="url" placeholder="https://ejemplo.com/foto.jpg" />
           </label>
-          <p v-if="modoFoto === 'url'" class="desc">Usa una imagen cuadrada y ligera. (Subir archivos requiere el plan de pago de Firebase.)</p>
+          <p v-if="modoFoto === 'url'" class="desc">Usa una imagen cuadrada y ligera.</p>
         </fieldset>
 
         <fieldset v-if="ed.tipo === 'especialidad'" class="caja">
@@ -269,6 +360,13 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
 .ins { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--sup2); }
 .ins.fav { background: #4a3a0c; color: #ffd86b; } .ins.promo { background: #5a1d17; color: #ffb3aa; } .ins.oculto { background: #444; color: #ddd; }
 .am .acciones .btn[disabled] { opacity: .35; }
+.topes { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .88rem; color: var(--suave); margin-bottom: 10px; }
+.topes b { color: var(--texto); } .topes .lleno, .topes .lleno b { color: #ff8a80; }
+.subida { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 10px; }
+.previa { width: 96px; height: 96px; border-radius: 14px; background: var(--sup2); display: grid; place-items: center; overflow: hidden; font-size: 2.2rem; }
+.previa img { width: 100%; height: 100%; object-fit: cover; }
+.subida-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.archivo { cursor: pointer; }
 .modal { position: fixed; inset: 0; z-index: 60; background: #000a; display: flex; align-items: flex-end; justify-content: center; padding: 0; }
 .modal-caja { background: var(--fondo); border: 1px solid var(--borde); border-radius: 22px 22px 0 0; width: 100%; max-width: 640px; max-height: 94dvh; overflow-y: auto; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
 .modal-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; position: sticky; top: -18px; background: var(--fondo); padding: 4px 0 8px; z-index: 1; }

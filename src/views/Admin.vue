@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth'
-import { collection, query, orderBy, limit, onSnapshot, updateDoc, deleteDoc, doc } from 'firebase/firestore'
+import { collection, query, orderBy, limit, onSnapshot, updateDoc, doc, serverTimestamp, deleteField } from 'firebase/firestore'
 import { auth, correoDeTelefono } from '../firebase/auth.js'
 import { db } from '../firebase/db.js'
 import { money } from '../data/menu.js'
@@ -132,39 +132,55 @@ const hora = (p) => { const f = fechaDe(p); return f ? f.toLocaleString('es-MX',
 const mapa = (p) => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(p.direccion)
 
 /* ---------- Resumen ---------- */
-const vendidos = (lista) => lista.filter((p) => p.estado !== 'cancelado')
-const hoy = computed(() => pedidos.value.filter((p) => { const f = fechaDe(p); return f && f >= inicioDia() }))
-const resumenHoy = computed(() => {
-  const v = vendidos(hoy.value), total = v.reduce((s, p) => s + (p.total || 0), 0)
-  return { pedidos: hoy.value.length, ventas: total, promedio: v.length ? Math.round(total / v.length) : 0, pendientes: hoy.value.filter((p) => ['nuevo', 'preparando', 'en_camino'].includes(p.estado)).length, entregados: hoy.value.filter((p) => p.estado === 'entregado').length }
+// "Vendido" = pedido que no se canceló. Los cancelados no cuentan en las ventas; se muestran aparte.
+const periodoResumen = ref('hoy') // hoy | 7 | 30 | todo
+const esVenta = (p) => p.estado !== 'cancelado'
+const enProceso = (p) => ['nuevo', 'preparando', 'en_camino'].includes(p.estado)
+const suma = (l) => l.reduce((s, p) => s + (p.total || 0), 0)
+const desdeResumen = () => periodoResumen.value === 'hoy' ? inicioDia() : periodoResumen.value === '7' ? inicioDia(new Date(Date.now() - 6 * 864e5)) : periodoResumen.value === '30' ? inicioDia(new Date(Date.now() - 29 * 864e5)) : null
+const enResumen = (p) => { const d = desdeResumen(); const f = fechaDe(p); return !d || !f || f >= d }
+const stats = computed(() => {
+  const lista = pedidos.value.filter(enResumen)
+  const validos = lista.filter(esVenta), canc = lista.filter((p) => p.estado === 'cancelado')
+  const ventas = suma(validos)
+  return {
+    recibidos: lista.length, vendidos: validos.length, entregados: lista.filter((p) => p.estado === 'entregado').length, enProceso: lista.filter(enProceso).length,
+    cancelados: canc.length, ventas, perdido: suma(canc), promedio: validos.length ? Math.round(ventas / validos.length) : 0,
+    tasa: lista.length ? Math.round((canc.length / lista.length) * 100) : 0,
+  }
 })
+const TITULO_PERIODO = { hoy: 'de hoy', 7: 'de los últimos 7 días', 30: 'de los últimos 30 días', todo: 'de todos los pedidos' }
 const dias = computed(() => {
   const out = []
   for (let i = 6; i >= 0; i--) {
     const d0 = inicioDia(new Date(Date.now() - i * 864e5)), d1 = new Date(d0.getTime() + 864e5)
-    const v = vendidos(pedidos.value.filter((p) => { const f = fechaDe(p); return f && f >= d0 && f < d1 }))
-    out.push({ clave: d0.toISOString(), nombre: d0.toLocaleDateString('es-MX', { weekday: 'short' }).replace('.', ''), pedidos: v.length, ventas: v.reduce((s, p) => s + (p.total || 0), 0) })
+    const dia = pedidos.value.filter((p) => { const f = fechaDe(p); return f && f >= d0 && f < d1 })
+    out.push({ clave: d0.toISOString(), nombre: d0.toLocaleDateString('es-MX', { weekday: 'short' }).replace('.', ''), pedidos: dia.filter(esVenta).length, cancelados: dia.filter((p) => !esVenta(p)).length, ventas: suma(dia.filter(esVenta)) })
   }
   const max = Math.max(1, ...out.map((d) => d.ventas))
   return out.map((d) => ({ ...d, alto: Math.max(d.ventas ? 6 : 0, Math.round((d.ventas / max) * 100)) }))
 })
 const topProductos = computed(() => {
   const m = new Map()
-  vendidos(pedidos.value.filter(enPeriodoResumen)).forEach((p) => (p.items || []).forEach((i) => m.set(i.nombre, (m.get(i.nombre) || 0) + (i.cantidad || 1))))
+  pedidos.value.filter(enResumen).filter(esVenta).forEach((p) => (p.items || []).forEach((i) => m.set(i.nombre, (m.get(i.nombre) || 0) + (i.cantidad || 1))))
   const arr = [...m].map(([nombre, n]) => ({ nombre, n })).sort((a, b) => b.n - a.n).slice(0, 6)
   const max = Math.max(1, ...arr.map((a) => a.n))
   return arr.map((a) => ({ ...a, ancho: Math.round((a.n / max) * 100) }))
 })
-function enPeriodoResumen(p) { const f = fechaDe(p); return !f || f >= inicioDia(new Date(Date.now() - 6 * 864e5)) }
 
 /* ---------- Acciones ---------- */
 async function cambiarEstado(p, nuevo) {
   try { await updateDoc(doc(db, 'pedidos', p.id), { estado: nuevo }) } catch { errorDatos.value = 'No se pudo actualizar el pedido.' }
 }
-async function borrar(p) {
-  if (!confirm(`¿Borrar el pedido de ${p.nombre}? No se puede deshacer.`)) return
-  try { await deleteDoc(doc(db, 'pedidos', p.id)) } catch { errorDatos.value = 'No se pudo borrar el pedido.' }
+// Los pedidos no se borran: se cancelan. Un pedido cancelado deja de contar en las ventas (queda en el historial y en el conteo de cancelados).
+async function cancelar(p) {
+  if (!confirm(`¿Cancelar el pedido de ${p.nombre} (${money(p.total)})? Ya no se contará en las ventas.`)) return
+  try { await updateDoc(doc(db, 'pedidos', p.id), { estado: 'cancelado', canceladoEn: serverTimestamp() }) } catch { errorDatos.value = 'No se pudo cancelar el pedido.' }
 }
+async function reabrir(p) {
+  try { await updateDoc(doc(db, 'pedidos', p.id), { estado: 'nuevo', canceladoEn: deleteField() }) } catch { errorDatos.value = 'No se pudo reabrir el pedido.' }
+}
+const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '')
 </script>
 
 <template>
@@ -243,11 +259,11 @@ async function borrar(p) {
               </div>
               <ul class="lineas"><li v-for="(i, n) in p.items" :key="n"><b>{{ i.cantidad }}×</b> {{ i.nombre }}<span v-if="i.detalle" class="desc"> — {{ i.detalle }}</span></li></ul>
               <div v-if="p.notas" class="aviso">Notas: {{ p.notas }}</div>
+              <p v-if="p.estado === 'cancelado'" class="desc" style="margin:8px 0 0">Cancelado<template v-if="horaCancelado(p)"> el {{ horaCancelado(p) }}</template>. No cuenta en las ventas.</p>
               <div class="acciones">
                 <button v-if="SIGUIENTE[p.estado]" class="btn chico verde" @click="cambiarEstado(p, SIGUIENTE[p.estado])">Pasar a: {{ ETIQUETA[SIGUIENTE[p.estado]] }}</button>
-                <button v-if="p.estado !== 'cancelado' && p.estado !== 'entregado'" class="btn chico claro" @click="cambiarEstado(p, 'cancelado')">Cancelar</button>
-                <button v-if="p.estado === 'cancelado' || p.estado === 'entregado'" class="btn chico claro" @click="cambiarEstado(p, 'nuevo')">Reabrir</button>
-                <button class="btn chico basura-btn" :aria-label="'Borrar pedido de ' + p.nombre" @click="borrar(p)"><Icono nombre="basura" :tam="18" /></button>
+                <button v-if="p.estado !== 'cancelado'" class="btn chico cancelar-btn" @click="cancelar(p)">✕ Cancelar pedido</button>
+                <button v-if="p.estado === 'cancelado'" class="btn chico claro" @click="reabrir(p)">Reabrir</button>
               </div>
             </article>
           </div>
@@ -255,27 +271,37 @@ async function borrar(p) {
 
         <!-- Resumen -->
         <section v-else-if="pestana === 'resumen'">
-          <div class="resumen">
-            <div class="tarjeta"><b>{{ resumenHoy.pedidos }}</b>Pedidos de hoy</div>
-            <div class="tarjeta"><b>{{ money(resumenHoy.ventas) }}</b>Ventas de hoy</div>
-            <div class="tarjeta"><b>{{ money(resumenHoy.promedio) }}</b>Ticket promedio</div>
-            <div class="tarjeta"><b>{{ resumenHoy.pendientes }}</b>Pendientes</div>
-            <div class="tarjeta"><b>{{ resumenHoy.entregados }}</b>Entregados</div>
+          <div class="adm-filtros">
+            <select v-model="periodoResumen" aria-label="Periodo del resumen">
+              <option value="hoy">Hoy</option><option value="7">Últimos 7 días</option><option value="30">Últimos 30 días</option><option value="todo">Todos los pedidos</option>
+            </select>
+          </div>
+          <div class="resumen resumen-grande">
+            <div class="tarjeta" data-k="recibidos"><b>{{ stats.recibidos }}</b>Pedidos recibidos</div>
+            <div class="tarjeta" data-k="vendidos"><b>{{ stats.vendidos }}</b>Vendidos <small>(sin cancelados)</small></div>
+            <div class="tarjeta" data-k="entregados"><b>{{ stats.entregados }}</b>Entregados</div>
+            <div class="tarjeta" data-k="proceso"><b>{{ stats.enProceso }}</b>En proceso</div>
+            <div class="tarjeta cancelados" data-k="cancelados"><b>{{ stats.cancelados }}</b>Cancelados</div>
+            <div class="tarjeta" data-k="ventas"><b>{{ money(stats.ventas) }}</b>Ventas {{ TITULO_PERIODO[periodoResumen] }}</div>
+            <div class="tarjeta cancelados" data-k="perdido"><b>{{ money(stats.perdido) }}</b>Monto cancelado</div>
+            <div class="tarjeta" data-k="promedio"><b>{{ money(stats.promedio) }}</b>Ticket promedio</div>
+            <div class="tarjeta cancelados" data-k="tasa"><b>{{ stats.tasa }}%</b>Pedidos cancelados</div>
           </div>
           <div class="adm-dos">
             <div class="tarjeta">
               <h3>Ventas de los últimos 7 días</h3>
               <div class="barras" role="img" aria-label="Ventas por día">
-                <div v-for="d in dias" :key="d.clave" class="barra"><span class="v">{{ d.ventas ? money(d.ventas) : '' }}</span><i :style="{ height: d.alto + '%' }"></i><span class="n">{{ d.nombre }}</span></div>
+                <div v-for="d in dias" :key="d.clave" class="barra"><span class="v">{{ d.ventas ? money(d.ventas) : '' }}</span><i :style="{ height: d.alto + '%' }"></i><span class="n">{{ d.nombre }}</span><span class="canc">{{ d.cancelados ? '✕ ' + d.cancelados : '' }}</span></div>
               </div>
+              <p class="desc" style="margin-top:6px">✕ = pedidos cancelados ese día (no suman a las ventas).</p>
             </div>
             <div class="tarjeta">
-              <h3>Más pedidos (7 días)</h3>
+              <h3>Más vendidos {{ TITULO_PERIODO[periodoResumen] }}</h3>
               <p v-if="!topProductos.length" class="desc">Aún no hay datos.</p>
               <div v-for="t in topProductos" :key="t.nombre" class="top"><div class="fila"><span class="grow">{{ t.nombre }}</span><b>{{ t.n }}</b></div><div class="riel"><i :style="{ width: t.ancho + '%' }"></i></div></div>
             </div>
           </div>
-          <p class="desc">Las cifras no incluyen pedidos cancelados. Se calculan con los últimos 500 pedidos.</p>
+          <p class="desc">Las ventas y lo más vendido no incluyen pedidos cancelados. Se calcula con los últimos 500 pedidos.</p>
         </section>
 
         <!-- Menú de la tienda -->
@@ -319,6 +345,11 @@ async function borrar(p) {
 .contacto { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 6px; }
 .enlace { color: #ffd48a; font-weight: 600; word-break: break-word; }
 .lineas { margin: 6px 0 0; padding-left: 20px; }
+.cancelar-btn { background: #e8392b1f; border: 1.5px solid #e8392b; color: #ff6a5c; box-shadow: none; }
+.resumen-grande { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.resumen .cancelados b { color: #ff6a5c; }
+.resumen small { color: var(--suave); }
+.barra .canc { font-size: .68rem; color: #ff6a5c; min-height: 1em; }
 .basura-btn { background: #e8392b1f; border: 1.5px solid #e8392b; color: #ff4d3f; box-shadow: none; padding: 8px 12px; }
 .resumen .tarjeta { font-size: .85rem; color: var(--suave); }
 .adm-dos { display: grid; gap: 12px; }

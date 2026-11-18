@@ -6,7 +6,7 @@ import MenuTabs from '../components/MenuTabs.vue'
 import ProductoCard from '../components/ProductoCard.vue'
 
 function pedir(p) {
-  const ok = agregar({ clave: `paq-${p.id}`, nombre: p.nombre, detalle: p.desc, precio: precioFinal(p), foto: fotoDe(p) || undefined, emoji: p.emoji })
+  const ok = agregar({ clave: `paq-${p.id}`, nombre: p.nombre, detalle: p.desc, precio: precioFinal(p), foto: p.foto || undefined, emoji: p.emoji })
   avisar(ok ? `${p.nombre} agregado` : 'El carrito está lleno')
 }
 </script>
