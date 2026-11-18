@@ -7,9 +7,13 @@ const SLUG = {
   'Salchicha italiana': 'salchicha-italiana', 'Chorizo': 'chorizo', 'Carne molida': 'carne-molida',
 }
 
-// De abajo hacia arriba: lo grande y plano abajo, lo pequeño encima (se ve más natural).
-export const ORDEN_CAPAS = ['Champiñones', 'Carne molida', 'Cebolla', 'Jamón', 'Salchicha', 'Salchicha italiana', 'Chorizo',
-  'Pepperoni', 'Pimiento verde', 'Jalapeño', 'Piña', 'Aceitunas negras']
+// Capas de abajo hacia arriba: lo grande y plano abajo, lo pequeño encima. Dentro de cada nivel el orden es al azar
+// (así cada pizza se apila distinto, pero nada queda tapado por completo).
+export const NIVELES_CAPAS = [
+  ['Champiñones', 'Carne molida', 'Cebolla', 'Jamón'],
+  ['Salchicha', 'Salchicha italiana', 'Chorizo', 'Pepperoni'],
+  ['Pimiento verde', 'Jalapeño', 'Piña', 'Aceitunas negras'],
+]
 
 // Piezas por pizza cuando el ingrediente va solo (con más ingredientes se reparte).
 export const PIEZAS = {

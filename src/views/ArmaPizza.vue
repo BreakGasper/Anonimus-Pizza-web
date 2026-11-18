@@ -13,6 +13,9 @@ const tamano = ref('med')
 const elegidos = ref([])
 const extras = ref([])
 const nombre = ref('')
+// Cada pizza nueva se arma distinta; "Mezclar" la reparte otra vez.
+const nuevaSemilla = () => Math.floor(Math.random() * 2 ** 31)
+const semilla = ref(nuevaSemilla())
 
 const tam = computed(() => TAMANOS.find((x) => x.id === tamano.value))
 const sobrantes = computed(() => Math.max(0, elegidos.value.length - ARMA.incluidos))
@@ -151,8 +154,11 @@ function pedir() {
 
   <h3>Así se verá tu pizza</h3>
   <div ref="zona" :class="['zona-pizza', { activa: sobrePizza, vacia: !elegidos.length }]">
-    <PizzaPreview :ingredientes="elegidos" :extras="extras" :tamano="tamano" :activa="sobrePizza" />
+    <PizzaPreview :ingredientes="elegidos" :extras="extras" :tamano="tamano" :activa="sobrePizza" :semilla="semilla" />
     <p class="pie-pizza">{{ tam.nombre }} · {{ tam.cm }}</p>
+    <div v-if="elegidos.length" style="text-align:center;margin-bottom:6px">
+      <button type="button" class="btn chico claro" @click="semilla = nuevaSemilla()">🔀 Mezclar</button>
+    </div>
     <p v-if="!elegidos.length" class="desc" style="text-align:center">Suelta aquí los ingredientes que quieras.</p>
     <div v-else class="lleva">
       <button v-for="ing in elegidos" :key="ing" type="button" class="quitar-ing" :aria-label="'Quitar ' + ing" @click="alternar(elegidos, ing)">{{ ing }} ✕</button>
