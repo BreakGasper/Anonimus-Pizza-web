@@ -10,6 +10,8 @@ const props = defineProps({
 })
 
 const ESCALA = { ind: 0.68, med: 0.84, fam: 1 }
+const DURACION = 480
+const HALO = { pepperoni: 0.5, chorizo: 0.42, salchicha: 0.3, 'salchicha-italiana': 0.36, jamon: 0.16, 'carne-molida': 0.3 }
 const MOVIMIENTO_REDUCIDO = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const caja = ref(null)
@@ -97,9 +99,9 @@ function dibujar() {
   const reparto = Math.max(0.6, 1 - 0.07 * (elegidos.length - 1)) // con más ingredientes, menos piezas de cada uno
   const vigentes = new Set()
   let animando = false, pendiente = false
+  const ALTO = W * 0.17 // desde qué altura "caen" las piezas
 
   ctx.save()
-  ctx.shadowColor = 'rgba(40,15,5,.5)'; ctx.shadowBlur = W * 0.011; ctx.shadowOffsetY = W * 0.004
   for (const slug of elegidos) {
     pedirAtlas(slug)
     const im = atlas.get(slug)
@@ -110,22 +112,57 @@ function dibujar() {
     for (let i = 0; i < n; i++) {
       const p = piezas[i], d = defs[p.s], clave = `${slug}:${i}`
       vigentes.add(clave)
-      if (!vistos.has(clave)) vistos.set(clave, ahora + (MOVIMIENTO_REDUCIDO ? -1000 : nuevas++ * 16))
-      const t = MOVIMIENTO_REDUCIDO ? 1 : Math.min(1, Math.max(0, (ahora - vistos.get(clave)) / 300))
+      if (!vistos.has(clave)) vistos.set(clave, ahora + (MOVIMIENTO_REDUCIDO ? -1000 : Math.min(nuevas++ * 22, 520)))
+      const t = MOVIMIENTO_REDUCIDO ? 1 : Math.min(1, Math.max(0, (ahora - vistos.get(clave)) / DURACION))
       if (t < 1) animando = true
       if (t <= 0) continue
-      const ease = 1 - (1 - t) ** 3
+      // cae (acelera), toca el queso y rebota un poquito
+      const caida = Math.min(1, t / 0.7)
+      let alto = ALTO * (1 - caida) ** 2
+      if (t > 0.7) alto = ALTO * 0.07 * Math.sin(Math.PI * ((t - 0.7) / 0.3))
+      const aterrizada = t >= 0.7 ? 1 : 0
+      const e = p.esc * k * (1 + 0.16 * (1 - caida))
+      const x = c + p.x * k, y = c + p.y * k
+
+      // aceite que suelta la carne sobre el queso
+      const halo = HALO[slug]
+      if (halo && aterrizada) {
+        const r = Math.max(d.w, d.h) * e * 0.62
+        const g = ctx.createRadialGradient(x, y, r * 0.35, x, y, r)
+        g.addColorStop(0, `rgba(235,125,25,${halo})`); g.addColorStop(1, 'rgba(235,125,25,0)')
+        ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = g
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.restore()
+      }
+
       ctx.save()
-      ctx.globalAlpha = ease
-      ctx.translate(c + p.x * k, c + p.y * k)
+      ctx.globalAlpha = Math.min(1, t / 0.25)
+      ctx.shadowColor = 'rgba(40,15,5,.5)'
+      ctx.shadowBlur = W * 0.011 + alto * 0.14
+      ctx.shadowOffsetY = W * 0.004 + alto * 0.55 // la sombra se queda en el queso mientras la pieza baja
+      ctx.translate(x, y - alto)
       ctx.rotate(p.rot)
-      const e = p.esc * k * (1 + (1 - ease) * 0.5)
       ctx.scale(e, e)
       ctx.drawImage(im, d.x, d.y, d.w, d.h, -d.w / 2, -d.h / 2, d.w, d.h)
       ctx.restore()
     }
   }
   ctx.restore()
+
+  // luz de horno: tono cálido, brillo del queso derretido y borde más oscuro para dar volumen
+  if (elegidos.length || props.extras.length) {
+    ctx.save()
+    ctx.beginPath(); ctx.arc(c, c, R * 0.995, 0, 7); ctx.clip()
+    let g = ctx.createRadialGradient(c * 0.85, c * 0.78, 0, c, c, R)
+    g.addColorStop(0, 'rgba(255,214,150,.42)'); g.addColorStop(1, 'rgba(255,150,60,.16)')
+    ctx.globalCompositeOperation = 'soft-light'; ctx.fillStyle = g; ctx.fillRect(0, 0, W, W)
+    g = ctx.createRadialGradient(c, c, R * 0.55, c, c, R)
+    g.addColorStop(0, 'rgba(110,45,5,0)'); g.addColorStop(1, 'rgba(110,45,5,.30)')
+    ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = g; ctx.fillRect(0, 0, W, W)
+    g = ctx.createRadialGradient(c * 0.72, c * 0.62, 0, c * 0.72, c * 0.62, R * 0.5)
+    g.addColorStop(0, 'rgba(255,255,255,.20)'); g.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = g; ctx.fillRect(0, 0, W, W)
+    ctx.restore()
+  }
   for (const clave of vistos.keys()) if (!vigentes.has(clave)) vistos.delete(clave)
 
   listo.value = !pendiente && !animando
@@ -157,13 +194,19 @@ watch(() => [props.ingredientes.slice(), props.extras.slice()], programar, { dee
     :data-ingredientes="ingredientes.length" :data-listo="listo"
     role="img" :aria-label="ingredientes.length ? 'Tu pizza con ' + ingredientes.join(', ') : 'Tu pizza solo con queso'">
     <canvas ref="lienzo" width="10" height="10"></canvas>
+    <div v-if="ingredientes.length" class="vapor" aria-hidden="true"><i></i><i></i><i></i></div>
   </div>
 </template>
 
 <style>
 .pizza-caja { position: relative; aspect-ratio: 1; margin: 0 auto; max-width: 340px; transition: width .3s ease, filter .2s; border-radius: 50%;
-  filter: drop-shadow(0 8px 10px #0005); }
-.pizza-caja.activa { filter: drop-shadow(0 0 12px #ff9800) drop-shadow(0 0 4px #ff9800); }
+  filter: drop-shadow(0 14px 14px #000a); }
+.pizza-caja.activa { filter: drop-shadow(0 0 14px #ff9800) drop-shadow(0 0 5px #ff9800); }
+.vapor { position: absolute; left: 18%; right: 18%; top: -16%; height: 46%; pointer-events: none; }
+.vapor i { position: absolute; bottom: 0; width: 40%; height: 75%; border-radius: 50%; opacity: 0; filter: blur(9px);
+  background: radial-gradient(closest-side, rgba(255,255,255,.38), rgba(255,255,255,0)); animation: sube 4s ease-out infinite; }
+.vapor i:nth-child(1) { left: 0; } .vapor i:nth-child(2) { left: 30%; animation-delay: 1.3s; } .vapor i:nth-child(3) { left: 60%; animation-delay: 2.6s; }
+@keyframes sube { 0% { opacity: 0; transform: translateY(30%) scale(.7); } 25% { opacity: .75; } 100% { opacity: 0; transform: translateY(-75%) scale(1.35); } }
 .pizza-caja canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .pizza-caja { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pizza-caja { transition: none; } .vapor { display: none; } }
 </style>

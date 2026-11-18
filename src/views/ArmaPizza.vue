@@ -185,9 +185,11 @@ function pedir() {
 .paleta { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
 .chip.ing { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .chip.ing .ico { width: 26px; height: 26px; object-fit: contain; flex: none; pointer-events: none; }
-.zona-pizza { background: radial-gradient(circle at 50% 40%, #f6ead8, #ead8bd); border: 2px dashed var(--linea); border-radius: 18px; padding: 16px 12px 12px; margin-bottom: 14px; transition: border-color .15s, background .15s; }
-.zona-pizza.activa { border-color: #ff9800; background: #fff1d6; }
-.pie-pizza { text-align: center; color: var(--suave); font-size: .85rem; margin: 6px 0 4px; }
+.zona-pizza { background: linear-gradient(rgba(25,10,3,.18), rgba(25,10,3,.5)), url('/img/mesa.webp') center / cover; border: 2px solid #4a2110;
+  border-radius: 18px; padding: 26px 12px 12px; margin-bottom: 14px; box-shadow: inset 0 0 40px #0008; transition: border-color .15s, box-shadow .15s; }
+.zona-pizza.activa { border-color: #ff9800; box-shadow: inset 0 0 40px #0008, 0 0 0 3px #ff980066; }
+.zona-pizza .desc { color: #f3dfc7; }
+.pie-pizza { text-align: center; color: #f3dfc7; text-shadow: 0 1px 3px #000a; font-size: .85rem; margin: 6px 0 4px; }
 .lleva { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
 .quitar-ing { border: 1px solid var(--linea); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: .8rem; }
 .fantasma { position: fixed; z-index: 50; transform: translate(-50%, -135%); pointer-events: none; display: flex; align-items: center; gap: 6px;
