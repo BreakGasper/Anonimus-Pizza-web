@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { items, total, cambiar, quitar, vaciar, ultimoPedido } from '../store/cart.js'
 import { crearPedido } from '../firebase/pedidos.js'
 import { money } from '../data/menu.js'
+import Icono from '../components/Icono.vue'
 
 const router = useRouter()
 const f = reactive({ nombre: '', telefono: '', calle: '', referencia: '', localidad: '', notas: '' })
@@ -57,10 +58,10 @@ async function confirmar() {
           <b>{{ i.nombre }}</b>
           <p v-if="i.detalle" class="desc">{{ i.detalle }}</p>
           <div class="cant" style="margin-top:8px">
-            <button type="button" aria-label="Quitar uno" @click="cambiar(i.clave, -1)">−</button>
+            <button type="button" class="menos" aria-label="Quitar uno" @click="cambiar(i.clave, -1)"><Icono nombre="menos" :tam="18" /></button>
             <b>{{ i.cantidad }}</b>
-            <button type="button" aria-label="Agregar uno" @click="cambiar(i.clave, 1)">+</button>
-            <button type="button" class="btn chico claro" style="margin-left:6px" @click="quitar(i.clave)">Quitar</button>
+            <button type="button" class="mas" aria-label="Agregar uno" @click="cambiar(i.clave, 1)"><Icono nombre="mas" :tam="18" /></button>
+            <button type="button" class="basura" :aria-label="'Quitar ' + i.nombre + ' del carrito'" title="Quitar del carrito" @click="quitar(i.clave)"><Icono nombre="basura" :tam="20" /></button>
           </div>
         </div>
         <div class="precio">{{ money(i.precio * i.cantidad) }}</div>

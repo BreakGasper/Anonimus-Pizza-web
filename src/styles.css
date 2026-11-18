@@ -119,7 +119,12 @@ input, textarea, select { font-size: 16px; } /* 16 px evita el zoom automático 
 
 /* ---------- Carrito ---------- */
 .cant { display: inline-flex; align-items: center; gap: 10px; }
-.cant button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--borde); background: var(--sup2); font-size: 1.15rem; line-height: 1; }
+.cant button { width: 40px; height: 40px; border-radius: 50%; border: 0; display: inline-grid; place-items: center; color: #fff; padding: 0; transition: transform .12s, filter .12s; }
+.cant button:active { transform: scale(.92); } .cant button:hover { filter: brightness(1.12); }
+.cant .menos { background: #2563eb; box-shadow: 0 3px 10px #2563eb55; }
+.cant .mas { background: var(--verde); box-shadow: 0 3px 10px #1fa84f55; }
+.cant .basura { margin-left: 10px; background: #e8392b1f; border: 1.5px solid #e8392b; color: #ff4d3f; box-shadow: none; }
+.cant .basura:hover { background: #e8392b33; }
 .total { display: flex; justify-content: space-between; font: 800 1.7rem var(--display); text-transform: uppercase; padding: 12px 0; border-top: 2px dashed var(--borde); margin-top: 6px; }
 .total span:last-child { color: var(--ambar); }
 label.campo { display: block; margin-bottom: 12px; font-weight: 600; font-size: .9rem; color: var(--suave); }

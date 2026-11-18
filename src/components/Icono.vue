@@ -8,6 +8,8 @@ const RUTAS = {
   promo: 'M20 12v8H4v-8M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z',
   carrito: 'M3 4h2l2.4 11h10.2L20 7H6M9.5 20.5h.01M17 20.5h.01',
   mas: 'M12 5v14M5 12h14',
+  menos: 'M5 12h14',
+  basura: 'M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3',
   flecha: 'M12 5v14M6 13l6 6 6-6',
 }
 </script>
