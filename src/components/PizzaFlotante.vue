@@ -53,12 +53,12 @@ defineExpose({ rect: () => (modo.value === 'oculta' || !props.visible ? null : r
 <template>
   <div v-if="modo !== 'oculta'" ref="raiz" :class="['flota', modo, { oculta: !visible }]" :style="{ width: ancho + 'px', left: (pos.x ?? 0) + 'px', top: (pos.y ?? ALTO_CAB) + 'px' }" role="group" aria-label="Vista rápida de tu pizza" data-flotante>
     <div class="flota-cab" @pointerdown="bajar" @pointermove="mover" @pointerup="soltar" @pointercancel="soltar">
-      <span class="flota-titulo">Tu pizza<b v-if="ingredientes.length" class="flota-n">{{ ingredientes.length }}</b></span>
+      <span class="flota-titulo"><Icono v-if="modo === 'mini'" nombre="pizza" :tam="16" /><template v-else>Tu pizza</template><b v-if="ingredientes.length" class="flota-n">{{ ingredientes.length }}</b></span>
       <button type="button" class="flota-b" :aria-label="modo === 'mini' ? 'Agrandar' : 'Reducir'" @click="alternarTam"><Icono :nombre="modo === 'mini' ? 'mas' : 'menos'" :tam="16" /></button>
       <button type="button" class="flota-b" aria-label="Ocultar la vista rápida" @click="ocultar"><Icono nombre="cerrar" :tam="16" /></button>
     </div>
     <div class="flota-pizza" aria-hidden="true">
-      <PizzaPreview mini :ingredientes="ingredientes" :extras="extras" tamano="fam" :semilla="semilla" :activa="activa" />
+      <PizzaPreview mini :pausado="!visible" :ingredientes="ingredientes" :extras="extras" tamano="fam" :semilla="semilla" :activa="activa" />
     </div>
     <button v-if="modo === 'grande'" type="button" class="flota-ir" @click="emit('ir')">Ver completa<Icono nombre="flecha" :tam="14" class="fin" /></button>
   </div>
@@ -66,16 +66,16 @@ defineExpose({ rect: () => (modo.value === 'oculta' || !props.visible ? null : r
 </template>
 
 <style>
-.flota { position: fixed; z-index: 28; background: #1b0f0acc; backdrop-filter: blur(8px); border: 1.5px solid #ffc24788; border-radius: 18px; box-shadow: 0 10px 26px #000a; padding: 4px 6px 6px;
+.flota { position: fixed; z-index: 28; background: #1b0f0af5; border: 1.5px solid #ffc24788; border-radius: 18px; box-shadow: 0 8px 20px #000a; padding: 4px 6px 6px; overflow: hidden; box-sizing: border-box; will-change: transform;
   transition: opacity .2s, transform .2s, width .2s; touch-action: none; }
 .flota.oculta { opacity: 0; transform: scale(.85); pointer-events: none; }
-.flota-cab { display: flex; align-items: center; gap: 2px; cursor: grab; user-select: none; -webkit-user-select: none; min-height: 32px; }
-.flota-titulo { flex: 1; font: 800 .8rem var(--display); text-transform: uppercase; letter-spacing: .04em; color: var(--ambar); padding-left: 4px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.flota-cab { display: flex; align-items: center; gap: 2px; min-width: 0; cursor: grab; user-select: none; -webkit-user-select: none; min-height: 32px; }
+.flota-titulo { flex: 1 1 auto; min-width: 0; overflow: hidden; font: 800 .8rem var(--display); text-transform: uppercase; letter-spacing: .04em; color: var(--ambar); padding-left: 4px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
 .flota-n { background: var(--rojo); color: #fff; border-radius: 999px; min-width: 18px; height: 18px; padding: 0 5px; font: 700 .7rem var(--cuerpo); display: inline-grid; place-items: center; }
-.flota-b { width: 30px; height: 30px; border-radius: 50%; background: #ffffff14; border: 0; color: var(--texto); display: grid; place-items: center; }
+.flota-b { flex: none; width: 28px; height: 28px; border-radius: 50%; background: #ffffff14; border: 0; color: var(--texto); display: grid; place-items: center; }
 .flota-pizza { padding: 2px 2px 0; }
 .flota-ir { display: block; width: 100%; margin-top: 6px; background: var(--sup2); border: 1px solid var(--borde); color: var(--texto); border-radius: 12px; padding: 8px; font-weight: 700; font-size: .85rem; }
-.flota-pildora { position: fixed; right: 12px; top: 76px; z-index: 28; display: inline-flex; align-items: center; gap: 6px; background: #1b0f0aee; border: 1.5px solid #ffc24788; color: var(--texto); border-radius: 999px; padding: 10px 14px; font-weight: 700; box-shadow: 0 6px 16px #0008; min-height: 44px; }
+.flota-pildora { position: fixed; right: 12px; top: 76px; z-index: 28; display: inline-flex; align-items: center; gap: 6px; background: #1b0f0af5; border: 1.5px solid #ffc24788; color: var(--texto); border-radius: 999px; padding: 10px 14px; font-weight: 700; box-shadow: 0 6px 16px #0008; min-height: 44px; }
 @media (min-width: 960px) { .flota, .flota-pildora { display: none; } }
 @media (prefers-reduced-motion: reduce) { .flota { transition: none; } }
 </style>
