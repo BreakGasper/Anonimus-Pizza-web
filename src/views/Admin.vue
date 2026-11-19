@@ -12,6 +12,7 @@ import Logo from '../components/Logo.vue'
 import Icono from '../components/Icono.vue'
 import AdminMenu from '../components/AdminMenu.vue'
 import AdminIngredientes from '../components/AdminIngredientes.vue'
+import AdminHistorial from '../components/AdminHistorial.vue'
 import AdminUsuarios from '../components/AdminUsuarios.vue'
 
 /* ---------- Sesión ---------- */
@@ -46,6 +47,15 @@ async function entrarConGoogle() {
   try { await signInWithPopup(auth, new GoogleAuthProvider()) }
   catch (e) { if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') errorLogin.value = 'No se pudo iniciar sesión con Google.' }
 }
+
+/* ---------- Móvil: menú de abajo (pulgar) y cuenta en una hoja ---------- */
+const mqMovil = typeof matchMedia === 'function' ? matchMedia('(max-width: 720px)') : null
+const esMovil = ref(!!mqMovil?.matches)
+const alCambiarMovil = (e) => (esMovil.value = e.matches)
+const menuCuenta = ref(false)
+bloquearFondo(() => menuCuenta.value)
+watch(esMovil, (m) => { if (!m) menuCuenta.value = false })
+const salir = () => { menuCuenta.value = false; signOut(auth) }
 
 /* ---------- Pedidos en vivo ---------- */
 const pedidos = ref([])
@@ -99,6 +109,7 @@ function escuchar() {
   })
 }
 onMounted(() => {
+  mqMovil?.addEventListener('change', alCambiarMovil)
   // Manifiesto solo del panel: al agregarlo a la pantalla de inicio se abre /admin (no la tienda).
   enlaceManifiesto = document.createElement('link'); enlaceManifiesto.rel = 'manifest'; enlaceManifiesto.href = '/admin.webmanifest'; document.head.appendChild(enlaceManifiesto)
   navigator.serviceWorker?.addEventListener('message', enMensaje)
@@ -115,7 +126,7 @@ onMounted(() => {
     escuchar()
   })
 })
-onUnmounted(() => { cortar?.(); document.title = tituloOriginal; quitarAvisos() })
+onUnmounted(() => { cortar?.(); document.title = tituloOriginal; quitarAvisos(); mqMovil?.removeEventListener('change', alCambiarMovil) })
 
 /* ---------- Aviso de pedidos nuevos ---------- */
 const tituloOriginal = typeof document !== 'undefined' ? document.title : ''
@@ -247,6 +258,13 @@ const visibles = computed(() => {
   return ordenar(lista)
 })
 const nuevos = computed(() => pedidos.value.filter((p) => p.estado === 'nuevo').length)
+const pestanas = computed(() => [
+  { id: 'pedidos', nombre: 'Pedidos', icono: 'lista' },
+  ...(esAdminRol.value ? [{ id: 'resumen', nombre: 'Resumen', icono: 'grafica' }] : []),
+  ...(puedeGestionar.value ? [{ id: 'menu', nombre: 'Menú', icono: 'carta' }, { id: 'ingredientes', nombre: 'Ingredientes', icono: 'hoja' }] : []),
+  ...(esAdminRol.value ? [{ id: 'usuarios', nombre: 'Usuarios', icono: 'pareja' }] : []),
+])
+const irA = (id) => { pestana.value = id; window.scrollTo(0, 0) }
 watch(nuevos, (n) => { document.title = n ? `(${n}) Pedidos nuevos · Anonimus` : tituloOriginal }, { immediate: true })
 
 const hora = (p) => { const f = fechaDe(p); return f ? f.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '' }
@@ -337,7 +355,10 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
   <div class="adm">
     <header class="adm-cab">
       <div class="adm-marca"><span class="adm-logo"><Logo /></span><div><b>Panel de administración</b><small>Anonimus Pizza</small></div></div>
-      <div v-if="usuario" class="adm-usuario">
+      <button v-if="usuario && esMovil" type="button" class="adm-cuenta" aria-label="Cuenta y ajustes" @click="menuCuenta = true">
+        <Icono nombre="usuario" :tam="24" /><i v-if="avisosActivos" class="adm-punto" aria-hidden="true"></i>
+      </button>
+      <div v-else-if="usuario" class="adm-usuario">
         <span class="adm-correo" title="Cuenta conectada"><Icono nombre="usuario" :tam="16" class="txt" />{{ usuario.email }}</span>
         <span v-if="rol" :class="['rol-insignia', rol]">{{ ROL_ETIQUETA[rol] }}</span>
         <label class="interruptor" title="Aviso sonoro de pedidos nuevos"><input type="checkbox" v-model="sonido" @change="guardarSonido" /><span><Icono nombre="campana" :tam="16" class="txt" />Sonido</span></label>
@@ -398,7 +419,26 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
           </div>
         </div>
 
-        <nav v-if="!soloPedidos" class="adm-tabs" aria-label="Secciones">
+        <div v-if="menuCuenta && esMovil" class="asig" role="dialog" aria-modal="true" aria-label="Cuenta y ajustes" @click.self="menuCuenta = false">
+          <div class="asig-caja cuenta-caja">
+            <div class="asig-cab"><h3 style="margin:0">Mi cuenta</h3><button type="button" class="asig-x" aria-label="Cerrar" @click="menuCuenta = false"><Icono nombre="cerrar" :tam="20" /></button></div>
+            <p class="adm-correo" style="margin:0 0 6px"><Icono nombre="usuario" :tam="16" class="txt" />{{ usuario.email }}</p>
+            <span v-if="rol" :class="['rol-insignia', rol]">{{ ROL_ETIQUETA[rol] }}</span>
+            <label class="cuenta-fila"><span><Icono nombre="campana" :tam="20" class="txt" />Sonido de pedidos nuevos</span><input type="checkbox" v-model="sonido" @change="guardarSonido" /></label>
+            <button type="button" :class="['btn', 'block', avisosActivos ? '' : 'claro']" :aria-pressed="avisosActivos" @click="alternarAvisos"><Icono nombre="campana" :tam="18" class="txt" />{{ avisosActivos ? 'Avisos activos (tocar para apagar)' : 'Activar avisos en este teléfono' }}</button>
+            <p v-if="ayudaAvisos && textoAvisos" class="sub aviso-ayuda" style="margin:8px 0 0">{{ textoAvisos }}</p>
+            <router-link to="/" class="btn block claro" style="margin-top:10px"><Icono nombre="izquierda" :tam="18" class="txt" />Ir a la tienda</router-link>
+            <button type="button" class="btn block cancelar-btn" style="margin-top:10px" @click="salir">Salir</button>
+          </div>
+        </div>
+
+        <nav v-if="!soloPedidos && esMovil" class="adm-nav" aria-label="Secciones">
+          <button v-for="t in pestanas" :key="t.id" type="button" :class="{ on: pestana === t.id }" :aria-current="pestana === t.id ? 'page' : null" @click="irA(t.id)">
+            <span class="adm-nav-ico"><Icono :nombre="t.icono" :tam="24" /><b v-if="t.id === 'pedidos' && nuevos" class="adm-nav-punto">{{ nuevos }}</b></span>{{ t.nombre }}
+          </button>
+        </nav>
+
+        <nav v-if="!soloPedidos && !esMovil" class="adm-tabs" aria-label="Secciones">
           <button :class="{ on: pestana === 'pedidos' }" @click="pestana = 'pedidos'">Pedidos <b v-if="nuevos" class="punto">{{ nuevos }}</b></button>
           <button v-if="esAdminRol" :class="{ on: pestana === 'resumen' }" @click="pestana = 'resumen'">Resumen</button>
           <button v-if="puedeGestionar" :class="{ on: pestana === 'menu' }" @click="pestana = 'menu'">Menú</button>
@@ -482,6 +522,7 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
             </div>
           </div>
           <p class="desc">Las ventas y lo más vendido no incluyen pedidos cancelados. Se calcula con los últimos 500 pedidos.</p>
+          <AdminHistorial :pedidos="pedidos" />
         </section>
 
         <!-- Menú de la tienda -->
@@ -497,6 +538,17 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 
 <style>
 .adm { max-width: 1100px; margin: 0 auto; }
+.adm-cuenta { position: relative; width: 48px; height: 48px; border-radius: 50%; background: var(--sup); border: 1px solid var(--borde); display: grid; place-items: center; flex: none; }
+.adm-punto { position: absolute; top: 9px; right: 9px; width: 10px; height: 10px; border-radius: 50%; background: var(--verde); border: 2px solid var(--fondo); }
+.cuenta-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; margin: 8px 0; border-top: 1px solid var(--borde); border-bottom: 1px solid var(--borde); min-height: 56px; }
+.cuenta-fila input { width: 26px; height: 26px; accent-color: var(--verde); }
+.adm-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; background: #160c08f5; border-top: 1px solid var(--borde); padding-bottom: env(safe-area-inset-bottom, 0px); backdrop-filter: blur(8px); }
+.adm-nav button { flex: 1; min-width: 0; min-height: 64px; display: grid; justify-items: center; align-content: center; gap: 3px; background: none; border: 0; color: var(--suave); font-size: .68rem; font-weight: 700; padding: 6px 2px; }
+.adm-nav button.on { color: var(--ambar); }
+.adm-nav button.on .adm-nav-ico { background: #ffc24724; }
+.adm-nav-ico { position: relative; width: 52px; height: 30px; border-radius: 999px; display: grid; place-items: center; transition: background .15s; }
+.adm-nav-punto { position: absolute; top: -4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--rojo); color: #fff; font-size: .68rem; display: grid; place-items: center; }
+@media (max-width: 720px) { .pagina.admin { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); } .adm-cab { flex-wrap: nowrap; } .adm-marca { min-width: 0; } .adm-marca b { font-size: 1.15rem; line-height: 1.05; } }
 .adm-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--borde); }
 .adm-marca { display: flex; align-items: center; gap: 12px; }
 .adm-marca b { display: block; font: 800 1.4rem var(--display); text-transform: uppercase; letter-spacing: .03em; }
