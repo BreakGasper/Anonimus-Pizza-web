@@ -9,6 +9,7 @@ const props = defineProps({
   tamano: { type: String, default: 'med' },
   activa: { type: Boolean, default: false }, // resalta mientras se arrastra encima
   semilla: { type: Number, default: 1 }, // cada valor distinto da una pizza distinta (posiciones, giros, orden)
+  mini: { type: Boolean, default: false }, // ventana flotante: ocupa todo su contenedor, sin vapor ni marcas de la pizza principal
 })
 
 const ESCALA = { ind: 0.68, med: 0.84, fam: 1 }
@@ -246,17 +247,20 @@ watch(() => props.semilla, () => { cache.clear(); vistos.clear(); programar() })
 </script>
 
 <template>
-  <div ref="caja" class="pizza-caja" :class="{ activa }" :style="{ width: ESCALA[tamano] * 100 + '%' }" data-pizza
+  <div ref="caja" class="pizza-caja" :class="{ activa, mini }" :style="{ width: mini ? '100%' : ESCALA[tamano] * 100 + '%' }"
+    v-bind="mini ? { 'data-pizza-mini': '' } : { 'data-pizza': '' }"
     :data-ingredientes="ingredientes.length" :data-listo="listo"
-    role="img" :aria-label="ingredientes.length ? 'Tu pizza con ' + ingredientes.join(', ') : 'Tu pizza solo con queso'">
+    :role="mini ? 'presentation' : 'img'" :aria-label="mini ? null : ingredientes.length ? 'Tu pizza con ' + ingredientes.join(', ') : 'Tu pizza solo con queso'">
     <canvas ref="lienzo" width="10" height="10"></canvas>
-    <div v-if="ingredientes.length" class="vapor" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div v-if="ingredientes.length && !mini" class="vapor" aria-hidden="true"><i></i><i></i><i></i></div>
   </div>
 </template>
 
 <style>
 .pizza-caja { position: relative; aspect-ratio: 1; margin: 0 auto; max-width: 340px; transition: width .3s ease, filter .2s; border-radius: 50%;
   filter: drop-shadow(0 14px 14px #000a); }
+.pizza-caja.mini { max-width: none; margin: 0; filter: drop-shadow(0 4px 6px #000a); }
+.pizza-caja.mini.activa { filter: drop-shadow(0 0 10px #ff9800) drop-shadow(0 0 3px #ff9800); }
 .pizza-caja.activa { filter: drop-shadow(0 0 14px #ff9800) drop-shadow(0 0 5px #ff9800); }
 .vapor { position: absolute; left: 18%; right: 18%; top: -16%; height: 46%; pointer-events: none; }
 .vapor i { position: absolute; bottom: 0; width: 40%; height: 75%; border-radius: 50%; opacity: 0; filter: blur(9px);
