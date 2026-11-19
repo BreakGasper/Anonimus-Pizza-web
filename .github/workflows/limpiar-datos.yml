@@ -36,12 +36,26 @@ jobs:
         run: |
           contar() { curl -fsS -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" "$API/$1?pageSize=300&mask.fieldPaths=nombre" | jq -r '"\(.documents // [] | length)\(if .nextPageToken then "+" else "" end)"'; }
           echo "pedidos: $(contar pedidos)"; echo "config: $(contar config)"; echo "admins (se conservan): $(contar admins)"
-      - name: Borrar los pedidos
-        run: npx --yes firebase-tools@latest firestore:delete pedidos --recursive --force --project "$PROYECTO" --non-interactive
-      - name: Borrar menú, fotos e ingredientes guardados
+      - name: Permisos de la cuenta de servicio
         run: |
+          curl -sS -X POST -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" -H "Content-Type: application/json" \
+            -d '{"permissions":["datastore.databases.get","datastore.entities.list","datastore.entities.delete"]}' \
+            "https://cloudresourcemanager.googleapis.com/v1/projects/$PROYECTO:testIamPermissions"
+      - name: Borrar pedidos, menú, fotos e ingredientes guardados
+        run: |
+          T="${{ steps.auth.outputs.access_token }}"
+          borrar_coleccion() { # borra todos los documentos de una colección (por REST, mostrando el error si lo hay)
+            while true; do
+              NOMBRES=$(curl -fsS -H "Authorization: Bearer $T" "$API/$1?pageSize=100&mask.fieldPaths=nombre" | jq -r '.documents // [] | .[].name')
+              [ -z "$NOMBRES" ] && break
+              for N in $NOMBRES; do
+                curl -sS --fail-with-body -X DELETE -H "Authorization: Bearer $T" "https://firestore.googleapis.com/v1/$N" > /dev/null && echo "borrado: ${N##*/documents/}" || { echo "NO se pudo borrar ${N##*/documents/}"; exit 1; }
+              done
+            done
+          }
+          borrar_coleccion pedidos
           for d in menu fotos ingredientes; do
-            npx --yes firebase-tools@latest firestore:delete "config/$d" --force --project "$PROYECTO" --non-interactive
+            curl -sS -o /dev/null -w "config/$d -> HTTP %{http_code}\n" -X DELETE -H "Authorization: Bearer $T" "$API/config/$d"
           done
       - name: Verificar que quedó limpio
         run: |
