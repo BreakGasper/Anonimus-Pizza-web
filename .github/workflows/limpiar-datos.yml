@@ -1,0 +1,52 @@
+name: Limpiar datos de prueba (una sola vez)
+# Borra TODOS los pedidos y el menú, las fotos y los ingredientes guardados (la tienda vuelve a los datos originales).
+# NO toca los usuarios del panel (colección admins) ni las cuentas de Authentication.
+# Es irreversible: solo corre a mano y pide escribir la confirmación.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: 'Escribe BORRAR PEDIDOS para continuar'
+        required: true
+concurrency:
+  group: limpiar-datos
+jobs:
+  limpiar:
+    if: ${{ inputs.confirmar == 'BORRAR PEDIDOS' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROYECTO: anonimus-pizza
+      API: https://firestore.googleapis.com/v1/projects/anonimus-pizza/databases/(default)/documents
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/cloud-platform
+      - name: Contar antes
+        run: |
+          contar() { curl -fsS -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" "$API/$1?pageSize=300&mask.fieldPaths=nombre" | jq -r '"\(.documents // [] | length)\(if .nextPageToken then "+" else "" end)"'; }
+          echo "pedidos: $(contar pedidos)"; echo "config: $(contar config)"; echo "admins (se conservan): $(contar admins)"
+      - name: Borrar los pedidos
+        run: npx --yes firebase-tools@latest firestore:delete pedidos --recursive --force --project "$PROYECTO" --non-interactive
+      - name: Borrar menú, fotos e ingredientes guardados
+        run: |
+          for d in menu fotos ingredientes; do
+            npx --yes firebase-tools@latest firestore:delete "config/$d" --force --project "$PROYECTO" --non-interactive
+          done
+      - name: Verificar que quedó limpio
+        run: |
+          contar() { curl -fsS -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" "$API/$1?pageSize=300&mask.fieldPaths=nombre" | jq -r '"\(.documents // [] | length)\(if .nextPageToken then "+" else "" end)"'; }
+          P=$(contar pedidos); C=$(contar config); A=$(contar admins)
+          echo "pedidos: $P · config: $C · admins (se conservan): $A"
+          test "$P" = "0" && test "$C" = "0"
+          test "$A" != "0"
