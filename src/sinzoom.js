@@ -6,10 +6,6 @@ export function bloquearZoomTactil() {
   document.addEventListener('gesturechange', parar)
   document.addEventListener('gestureend', parar)
   document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault() }, { passive: false })
-  let ultimo = 0
-  document.addEventListener('touchend', (e) => {
-    const ahora = Date.now()
-    if (ahora - ultimo < 320 && e.target.closest && !e.target.closest('input, textarea, select')) e.preventDefault() // doble toque
-    ultimo = ahora
-  }, { passive: false })
+  // El zoom por doble toque lo evita `touch-action: manipulation` (styles.css). Antes también se cancelaba el `touchend` de dos toques seguidos,
+  // pero eso cancelaba el clic de cualquier botón tocado en menos de 320 ms tras otro toque: los botones "no respondían".
 }
