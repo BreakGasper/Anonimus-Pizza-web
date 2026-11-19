@@ -9,7 +9,7 @@ import Icono from '../components/Icono.vue'
 import { iconoProducto } from '../utils/iconos.js'
 import Tamanos from '../components/Tamanos.vue'
 import PizzaPreview from '../components/PizzaPreview.vue'
-import { imgIcono } from '../data/imagenes.js'
+import { verduras, carnes, activos, porNombre, urlImagen, vigentes } from '../store/ingredientes.js'
 
 const router = useRouter()
 const tamano = ref('med')
@@ -121,16 +121,16 @@ function irAPizza() {
   setTimeout(() => zona.value?.scrollIntoView({ behavior: reducido ? 'auto' : 'smooth', block: 'center' }), 60)
 }
 function aplicar(lista) {
-  elegidos.value = [...lista]
+  elegidos.value = vigentes(lista) // si el panel quitó un ingrediente de la receta, simplemente no se pone
   semilla.value = nuevaSemilla()
   irAPizza()
 }
 function sorprender() {
-  const todos = [...ARMA.verduras, ...ARMA.carnes]
+  const todos = activos.value.map((i) => i.nombre)
   for (let i = todos.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [todos[i], todos[j]] = [todos[j], todos[i]] }
   aplicar(todos.slice(0, 3 + Math.floor(Math.random() * 3)))
 }
-const esReceta = (e) => e.ingredientes.length === elegidos.value.length && e.ingredientes.every((i) => elegidos.value.includes(i))
+const esReceta = (e) => { const r = vigentes(e.ingredientes); return r.length > 0 && r.length === elegidos.value.length && r.every((i) => elegidos.value.includes(i)) }
 
 /* ---------- Barra de pedido: ¿se ve la pizza? ---------- */
 const pizzaVisible = ref(true)
@@ -173,7 +173,7 @@ function pedir() {
         <h3>Empieza rápido</h3>
         <p class="desc" style="margin-bottom:8px">Toca una especialidad y ajústala a tu gusto, o deja que te sorprendamos.</p>
         <div class="rapido">
-          <button v-for="e in recetas" :key="e.id" type="button" :class="['chip esp', { on: esReceta(e) }]" :aria-pressed="esReceta(e)" @click="aplicar(e.ingredientes)">
+          <button v-for="e in recetas.filter((x) => vigentes(x.ingredientes).length)" :key="e.id" type="button" :class="['chip esp', { on: esReceta(e) }]" :aria-pressed="esReceta(e)" @click="aplicar(e.ingredientes)">
             <img v-if="fotoDe(e)" :src="fotoDe(e)" alt="" width="30" height="30" /><span v-else class="mini-emoji" aria-hidden="true"><Icono :nombre="iconoProducto(e)" :tam="20" /></span>{{ e.nombre }}
           </button>
           <button type="button" class="chip sorpresa" @click="sorprender"><Icono nombre="dado" :tam="18" class="txt" />Sorpréndeme</button>
@@ -189,15 +189,15 @@ function pedir() {
         <h3>Ingredientes</h3>
         <p class="desc" style="margin-bottom:8px">Tócalos o <b>arrástralos</b> a la pizza<span class="solo-tactil"> (mantén presionado y arrastra)</span>.</p>
         <div class="paleta" aria-label="Verduras">
-          <button v-for="v in ARMA.verduras" :key="v" type="button" :class="['chip ing', { on: elegidos.includes(v) }]"
-            :aria-pressed="elegidos.includes(v)" @pointerdown="empezar($event, v)" @click="clic(v)" @contextmenu.prevent>
-            <img :src="imgIcono(v)" alt="" class="ico" width="26" height="26" draggable="false" />{{ v }}
+          <button v-for="v in verduras" :key="v.id" type="button" :class="['chip ing', { on: elegidos.includes(v.nombre) }]"
+            :aria-pressed="elegidos.includes(v.nombre)" @pointerdown="empezar($event, v.nombre)" @click="clic(v.nombre)" @contextmenu.prevent>
+            <img v-if="urlImagen(v)" :src="urlImagen(v)" alt="" class="ico" width="26" height="26" draggable="false" />{{ v.nombre }}
           </button>
         </div>
         <div class="paleta" aria-label="Carnes">
-          <button v-for="c in ARMA.carnes" :key="c" type="button" :class="['chip ing', { on: elegidos.includes(c) }]"
-            :aria-pressed="elegidos.includes(c)" @pointerdown="empezar($event, c)" @click="clic(c)" @contextmenu.prevent>
-            <img :src="imgIcono(c)" alt="" class="ico" width="26" height="26" draggable="false" />{{ c }}
+          <button v-for="c in carnes" :key="c.id" type="button" :class="['chip ing', { on: elegidos.includes(c.nombre) }]"
+            :aria-pressed="elegidos.includes(c.nombre)" @pointerdown="empezar($event, c.nombre)" @click="clic(c.nombre)" @contextmenu.prevent>
+            <img v-if="urlImagen(c)" :src="urlImagen(c)" alt="" class="ico" width="26" height="26" draggable="false" />{{ c.nombre }}
           </button>
         </div>
       </section>
@@ -250,7 +250,7 @@ function pedir() {
   </div>
 
   <div v-if="arrastre" class="fantasma" :style="{ left: arrastre.x + 'px', top: arrastre.y + 'px' }" aria-hidden="true">
-    <img :src="imgIcono(arrastre.nombre)" alt="" width="38" height="38" />
+    <img :src="urlImagen(porNombre(arrastre.nombre))" alt="" width="38" height="38" />
     <span>{{ arrastre.nombre }}</span>
   </div>
 </template>

@@ -3,6 +3,7 @@ import { MENU_INICIAL, precioPorTamano } from '../data/menu.js'
 import { imgEspecialidad, imgCalzone, imgBase } from '../data/imagenes.js'
 import { firebaseConfig } from '../firebase/claves.js'
 import { iconoProducto } from '../utils/iconos.js'
+import { aplicarLista, aplicarImagenes, versionImagenes } from './ingredientes.js'
 
 // ---------- Normalización: el menú guardado puede traer campos faltantes ----------
 export function normalizar(it) {
@@ -43,6 +44,18 @@ function valor(v) {
 }
 const origen = () => (import.meta.env.VITE_EMULATOR === '1' ? 'http://127.0.0.1:8080' : 'https://firestore.googleapis.com')
 
+// Imágenes de los ingredientes: igual que las fotos, solo se descargan cuando cambia la versión.
+async function sincronizarImagenesIng(version) {
+  if (!version) { aplicarImagenes(null, 0); return }
+  if (versionImagenes() === version) return // ya están en el dispositivo (se leyeron al iniciar)
+  try {
+    const r = await fetch(`${origen()}/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/config/ingredientes?mask.fieldPaths=imagenes&key=${firebaseConfig.apiKey}`)
+    if (!r.ok) return
+    const doc = await r.json()
+    aplicarImagenes(doc.fields?.imagenes ? valor(doc.fields.imagenes) : {}, version)
+  } catch { /* sin conexión: se quedan las que ya había */ }
+}
+
 async function sincronizarFotos(version) {
   if (!version) { fotosSubidas.value = {}; try { localStorage.removeItem(CACHE_FOTOS) } catch { /* sin almacenamiento */ } return }
   const cache = leerCacheFotos()
@@ -61,9 +74,13 @@ export async function cargarMenu() {
   try {
     // Se pide la lista de la colección `config` (responde 200 aunque no exista el menú; un `get` daría 404 y ensucia la consola).
     // La máscara trae solo los productos y la versión de las fotos, no las fotos mismas.
-    const r = await fetch(`${origen()}/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/config?pageSize=20&mask.fieldPaths=items&mask.fieldPaths=fotosVersion&key=${firebaseConfig.apiKey}`)
+    const r = await fetch(`${origen()}/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/config?pageSize=20&mask.fieldPaths=items&mask.fieldPaths=fotosVersion&mask.fieldPaths=lista&mask.fieldPaths=version&key=${firebaseConfig.apiKey}`)
     if (r.ok) {
-      const lista = ((await r.json()).documents || []).find((d) => d.name.endsWith('/config/menu'))
+      const docs = (await r.json()).documents || []
+      const ing = docs.find((d) => d.name.endsWith('/config/ingredientes'))
+      aplicarLista(ing?.fields?.lista ? valor(ing.fields.lista) : null)
+      sincronizarImagenesIng(ing?.fields?.version ? Number(valor(ing.fields.version)) : 0) // sin esperar: no frena el menú
+      const lista = docs.find((d) => d.name.endsWith('/config/menu'))
       const guardados = lista?.fields?.items ? valor(lista.fields.items) : null
       if (Array.isArray(guardados)) {
         items.value = guardados.map(normalizar)

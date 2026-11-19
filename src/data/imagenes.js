@@ -22,6 +22,9 @@ export const PIEZAS = {
 }
 
 export const slugDe = (nombre) => SLUG[nombre]
+// Nivel de apilado (0 abajo … 2 arriba) de los ingredientes incluidos; los que agrega el panel van según su tipo.
+export const NIVEL_DE = Object.fromEntries(NIVELES_CAPAS.flatMap((n, i) => n.map((nombre) => [SLUG[nombre], i])))
+export const imgIconoSlug = (slug) => `${base}img/iconos/${slug}.webp`
 export const imgBase = `${base}img/base.webp`
 export const imgLogo = `${base}img/logo.webp`
 export const urlSprites = `${base}img/sprites/sprites.json`

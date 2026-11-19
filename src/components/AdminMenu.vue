@@ -3,6 +3,7 @@ import { ref, computed, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { doc, onSnapshot, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore'
 import Icono from './Icono.vue'
 import { ICONOS_PRODUCTO, iconoProducto } from '../utils/iconos.js'
+import { ingredientes as ingredientesTodos } from '../store/ingredientes.js'
 import { dbAdmin as db } from '../firebase/admin.js'
 import { MENU_INICIAL, ARMA, money, TITULOS_CATEGORIA } from '../data/menu.js'
 import { normalizar, FOTOS_BIBLIOTECA, fotoDe, hayPromo, precioFinal, fotosSubidas } from '../store/menu.js'
@@ -23,7 +24,7 @@ const MAX_PRINCIPALES = 20
 const esPrincipal = (tipo) => tipo === 'especialidad' || tipo === 'paquete'
 
 const TIPOS = { especialidad: 'Especialidad', paquete: 'Paquete', adicional: 'Adicional' }
-const TODOS_INGREDIENTES = [...ARMA.verduras, ...ARMA.carnes]
+const TODOS_INGREDIENTES = computed(() => ingredientesTodos.value.map((i) => i.nombre))
 
 onMounted(() => {
   cortar = onSnapshot(doc(db, 'config', 'menu'), (s) => {

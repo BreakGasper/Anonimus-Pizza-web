@@ -43,6 +43,15 @@ Las **reglas de Firestore** hacen cumplir los permisos (no solo la pantalla).
 - Un perfil `activo: false` no tiene ningún acceso. No se puede desactivar la propia cuenta ni al último admin.
 - El panel usa su **propia sesión** de Firebase (app "admin"), separada de la de los clientes; las cuentas `@admin.anonimus.pizza` no pueden registrarse ni entrar como clientes.
 
+## Ingredientes de "Arma tu pizza" (panel → Ingredientes)
+
+Admin y tienda pueden **agregar, ocultar, quitar y cambiar la foto** de los ingredientes que el cliente elige (los 12 originales traen sus fotos recortadas). Cada ingrediente tiene nombre, tipo (carne o verdura/fruta, para ordenar las capas), cantidad y tamaño de piezas en la pizza.
+
+- **Fondo transparente siempre:** al subir una foto, el navegador **quita el fondo** (parte del borde y avanza por los tonos parecidos al color de fondo), recorta el sobrante y la guarda como WebP con transparencia. Hay un control de **sensibilidad** y una vista previa sobre cuadritos; si la imagen ya es un PNG sin fondo se usa tal cual. Funciona mejor con fondo liso (blanco); con fondos complicados pueden quedar restos y conviene subir un PNG sin fondo.
+- **Dónde se guardan:** en `config/ingredientes` (`lista`, `imagenes` y `version`), aparte de las fotos del menú. Máximo **40 ingredientes** y **24 fotos propias** (cada una ≤ 28 000 caracteres); las reglas lo exigen. La tienda lee la lista junto con el menú y descarga las imágenes solo cuando cambia `version`.
+- Un ingrediente nuevo se dibuja sobre la pizza con su imagen (girada y repartida al azar); los de fábrica conservan sus piezas hasta que se les cambia la foto ("Volver a la original" las restaura).
+- El nombre no se edita (las especialidades lo usan): para otro nombre se agrega uno nuevo y se quita el anterior. Si se oculta o quita un ingrediente, las especialidades que lo usan simplemente lo omiten.
+
 ## Avisos de pedidos nuevos en el teléfono
 
 El panel se puede **instalar en la pantalla de inicio** (Android: menú del navegador → *Instalar app*; iPhone: Compartir → *Agregar a pantalla de inicio*, iOS 16.4 o superior). Cada persona del panel (admin, tienda o empleado) toca **Activar avisos** y acepta el permiso: desde entonces, cada pedido nuevo muestra una **notificación del sistema** y, al tocarla, se abre el panel en ese pedido (`/admin?pedido=ID`). Los clientes no reciben nada.
@@ -103,6 +112,7 @@ Sin conexión a Firestore la tienda usa el menú inicial de `src/data/menu.js`.
 | `admins/{uid}` | `nombre`, `telefono`, `rol` (`admin`/`tienda`/`empleado`/`repartidor`), `activo` | admin |
 | `config/menu` | `items[]` (todo el menú) y `fotosVersion` | admin / tienda |
 | `config/fotos` | `fotos` (id → imagen WebP en data URL) y `version` | admin / tienda |
+| `config/ingredientes` | `lista` (ingredientes de Arma tu pizza), `imagenes` (id → WebP transparente) y `version` | admin / tienda |
 
 - `config/*` es de lectura pública. Un cliente solo lee **sus** pedidos (consulta por `uid`, sin índices); un pedido sin dueño puede ser reclamado una sola vez por una cuenta.
 - **Pedidos cancelados** no cuentan en las ventas.
