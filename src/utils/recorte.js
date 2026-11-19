@@ -29,6 +29,49 @@ export async function leerFuente(archivo) {
   return ctx.getImageData(0, 0, w, h)
 }
 
+// Lee una imagen ya guardada (dirección o data URL) para volver a ajustarla.
+export async function leerFuenteUrl(url) {
+  const im = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => mal(new ErrorImagenIng('No se pudo leer la imagen.')); i.src = url })
+  const r = Math.min(1, LADO_TRABAJO / Math.max(im.naturalWidth, im.naturalHeight))
+  const w = Math.max(1, Math.round(im.naturalWidth * r)), h = Math.max(1, Math.round(im.naturalHeight * r))
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h
+  const ctx = cv.getContext('2d', { willReadFrequently: true })
+  ctx.drawImage(im, 0, 0, w, h)
+  return ctx.getImageData(0, 0, w, h)
+}
+
+export const AJUSTES_NEUTROS = { tono: 0, saturacion: 100, contraste: 100, brillo: 100 }
+export const hayAjustes = (a) => !!a && (a.tono !== 0 || a.saturacion !== 100 || a.contraste !== 100 || a.brillo !== 100)
+
+/* Editor de color: tono (−180° a 180°), saturación y contraste y brillo (en %). Respeta la transparencia. */
+export function ajustarColor(d, a) {
+  if (!hayAjustes(a)) return d
+  const out = new ImageData(new Uint8ClampedArray(d.data), d.width, d.height), p = out.data
+  const kc = a.contraste / 100, kb = a.brillo / 100, ks = a.saturacion / 100, h0 = a.tono / 360
+  const clamp = (v) => (v < 0 ? 0 : v > 255 ? 255 : v)
+  const hue = (p1, q1, t) => { if (t < 0) t += 1; if (t > 1) t -= 1; return t < 1 / 6 ? p1 + (q1 - p1) * 6 * t : t < 1 / 2 ? q1 : t < 2 / 3 ? p1 + (q1 - p1) * (2 / 3 - t) * 6 : p1 }
+  for (let i = 0; i < p.length; i += 4) {
+    if (p[i + 3] === 0) continue
+    let r = clamp((p[i] * kb - 128) * kc + 128), g = clamp((p[i + 1] * kb - 128) * kc + 128), b = clamp((p[i + 2] * kb - 128) * kc + 128)
+    if (ks !== 1 || h0 !== 0) {
+      r /= 255; g /= 255; b /= 255
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, dd = mx - mn
+      let h = 0, s = 0
+      if (dd > 1e-6) {
+        s = l > 0.5 ? dd / (2 - mx - mn) : dd / (mx + mn)
+        h = mx === r ? (g - b) / dd + (g < b ? 6 : 0) : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4
+        h /= 6
+      }
+      h = (h + h0 + 1) % 1; s = Math.min(1, Math.max(0, s * ks))
+      if (s === 0) r = g = b = l
+      else { const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p1 = 2 * l - q; r = hue(p1, q, h + 1 / 3); g = hue(p1, q, h); b = hue(p1, q, h - 1 / 3) }
+      r *= 255; g *= 255; b *= 255
+    }
+    p[i] = r; p[i + 1] = g; p[i + 2] = b
+  }
+  return out
+}
+
 const alfa = (d, x, y) => d.data[(y * d.width + x) * 4 + 3]
 
 // ¿Ya viene con fondo transparente? (esquinas transparentes o buena parte de la imagen transparente)
@@ -119,10 +162,17 @@ export function exportar(datos) {
   throw new ErrorImagenIng('La imagen es demasiado pesada. Prueba con otra foto más sencilla.')
 }
 
-// Todo junto: de la fuente (ImageData) al resultado final con el fondo transparente.
-export function procesar(fuente, quitar, sensibilidad) {
+// Todo junto: de la fuente (ImageData) al resultado final con el fondo transparente (y los ajustes de color).
+export function procesar(fuente, quitar, sensibilidad, ajustes) {
   const datos = quitar ? quitarFondo(fuente, sensibilidad) : fuente
-  const r = exportar(datos)
+  const r = exportar(ajustarColor(datos, ajustes))
   r.fondoPocoUniforme = quitar && datos.uniforme < 0.5
+  return r
+}
+// Para el editor en vivo: el fondo se quita una vez y el color se reaplica rápido al mover los controles.
+export const sinFondo = (fuente, quitar, sensibilidad) => (quitar ? quitarFondo(fuente, sensibilidad) : fuente)
+export function conAjustes(base, ajustes) {
+  const r = exportar(ajustarColor(base, ajustes))
+  r.fondoPocoUniforme = !!base.uniforme && base.uniforme < 0.5
   return r
 }

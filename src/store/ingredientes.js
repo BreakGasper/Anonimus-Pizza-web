@@ -15,7 +15,7 @@ export function normalizarIng(it) {
   const n = (v, a, b, d) => { const x = Number(v); return Number.isFinite(x) && x > 0 ? Math.min(b, Math.max(a, Math.round(x))) : d }
   return {
     id: String(it.id || '').slice(0, 40), nombre: String(it.nombre || '').trim().slice(0, 30), tipo: it.tipo === 'carne' ? 'carne' : 'verdura',
-    activo: it.activo !== false, piezas: n(it.piezas, 4, 60, 0), tam: n(it.tam, 50, 200, 0), // 0 = automático
+    activo: it.activo !== false, piezas: n(it.piezas, 4, 60, 0), tam: n(it.tam, 20, 220, 0), // 0 = automático (tam 110 = tamaño normal)
   }
 }
 
