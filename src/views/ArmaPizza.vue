@@ -9,6 +9,7 @@ import Icono from '../components/Icono.vue'
 import { iconoProducto } from '../utils/iconos.js'
 import Tamanos from '../components/Tamanos.vue'
 import PizzaPreview from '../components/PizzaPreview.vue'
+import PizzaFlotante from '../components/PizzaFlotante.vue'
 import { verduras, carnes, activos, porNombre, urlImagen, vigentes } from '../store/ingredientes.js'
 
 const router = useRouter()
@@ -38,22 +39,24 @@ function alternar(lista, valor) {
 /* ---------- Arrastrar ingredientes hacia la pizza ---------- */
 const zona = ref(null)
 const vista = ref(null)
+const flotante = ref(null)
+const sobreFlotante = ref(false)
 const arrastre = ref(null) // { nombre, x, y } mientras se arrastra
 const sobrePizza = ref(false)
 let gesto = null
 let ignorarClic = false
 const PRESION_MS = 260 // en pantalla táctil, se mantiene presionado para arrastrar (así el dedo aún puede desplazar la página)
 
-const dentro = (e) => {
-  const r = zona.value?.getBoundingClientRect()
-  return !!r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
-}
+const enRect = (r, e) => !!r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+// Se puede soltar un ingrediente sobre la pizza principal o sobre la ventana flotante.
+const dentro = (e) => enRect(zona.value?.getBoundingClientRect(), e) || enRect(flotante.value?.rect?.(), e)
 
 function limpiar() {
   clearTimeout(gesto?.timer)
   gesto = null
   arrastre.value = null
   sobrePizza.value = false
+  sobreFlotante.value = false
   window.removeEventListener('pointermove', mover)
   window.removeEventListener('pointerup', soltar)
   window.removeEventListener('pointercancel', cancelar)
@@ -88,7 +91,8 @@ function mover(e) {
     return
   }
   arrastre.value = { nombre: gesto.nombre, x: e.clientX, y: e.clientY }
-  sobrePizza.value = dentro(e)
+  sobrePizza.value = enRect(zona.value?.getBoundingClientRect(), e)
+  sobreFlotante.value = enRect(flotante.value?.rect?.(), e)
   if (e.clientY > window.innerHeight - 80) window.scrollBy(0, 14) // acerca la pizza si está abajo
 }
 
@@ -248,6 +252,8 @@ function pedir() {
       <button class="btn" @click="pedir">Agregar al carrito</button>
     </div>
   </div>
+
+  <PizzaFlotante v-if="!esEscritorio" ref="flotante" :ingredientes="elegidos" :extras="extras" :semilla="semilla" :visible="!pizzaVisible" :activa="sobreFlotante" @ir="irAPizza" />
 
   <div v-if="arrastre" class="fantasma" :style="{ left: arrastre.x + 'px', top: arrastre.y + 'px' }" aria-hidden="true">
     <img :src="urlImagen(porNombre(arrastre.nombre))" alt="" width="38" height="38" />

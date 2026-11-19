@@ -11,6 +11,7 @@ App web para hacer **pedidos de pizzas a domicilio**, personalizadas, con entreg
 **Para el cliente**
 - Menú de **especialidades**, **paquetes/promos** y **adicionales** (calzones, bebidas), con fotos.
 - **Arma tu pizza:** elige tamaño e ingredientes tocándolos o arrastrándolos, y ve cómo queda la pizza (vista previa realista con posiciones al azar; solo caen los ingredientes que eliges). También hay "Sorpréndeme".
+- **Ventana flotante de tu pizza (móvil):** mientras eliges ingredientes, una vista pequeña de la pizza armándose te sigue por la página (aparece cuando la pizza principal no se ve). Se puede **arrastrar**, **agrandar/reducir** (con "Ver completa") y **ocultar**, y también puedes **soltar ingredientes sobre ella**. En pantallas grandes la pizza ya queda fija al lado.
 - **Carrito en dos pasos** (carrito → datos de entrega) con los datos guardados en el dispositivo para la siguiente compra.
 - **Perfil** (`/perfil`): cuenta con correo/contraseña o Google para ver sus pedidos y tickets, del más reciente al más antiguo, con el estado en vivo. Los pedidos hechos sin cuenta en ese dispositivo se pasan a la cuenta al iniciar sesión.
 - Pensada para móvil (barra inferior, sin zoom accidental) y escritorio (menú superior, 2 columnas en "Arma tu pizza"). Interfaz en español, tema oscuro "horno" y un solo set de íconos de línea.
