@@ -1,6 +1,6 @@
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
-import { imgBase, urlSprites, imgAtlas, NIVELES_CAPAS, NIVEL_DE, PIEZAS } from '../data/imagenes.js'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { imgBase, urlSprites, imgAtlas, slugDe, NIVELES_CAPAS, PIEZAS } from '../data/imagenes.js'
 import { ingredientes as listaIng, imagenesIng, porNombre, esDeFabrica } from '../store/ingredientes.js'
 
 const props = defineProps({
@@ -9,6 +9,8 @@ const props = defineProps({
   tamano: { type: String, default: 'med' },
   activa: { type: Boolean, default: false }, // resalta mientras se arrastra encima
   semilla: { type: Number, default: 1 }, // cada valor distinto da una pizza distinta (posiciones, giros, orden)
+  // Ingredientes de prueba (editor del panel, sin guardar): { ing: {id, nombre, tipo, piezas, tam}, url?: imagen } que reemplazan al guardado con el mismo id.
+  borradores: { type: Array, default: () => [] },
   mini: { type: Boolean, default: false }, // ventana flotante: ocupa todo su contenedor, sin vapor ni marcas de la pizza principal
 })
 
@@ -18,6 +20,10 @@ const DURACION = 480
 const ESCASEZ = 0.8
 const HALO = { pepperoni: 0.5, chorizo: 0.42, salchicha: 0.3, 'salchicha-italiana': 0.36, jamon: 0.16, 'carne-molida': 0.3 }
 const MOVIMIENTO_REDUCIDO = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+
+// Lista efectiva: la guardada, con los borradores encima.
+const ingEfectivos = computed(() => [...listaIng.value.filter((i) => !props.borradores.some((b) => b.ing.id === i.id)), ...props.borradores.map((b) => b.ing)])
+let ultimaBorrador = null // última imagen de borrador ya cargada (evita parpadeos mientras carga la siguiente)
 
 const caja = ref(null)
 const lienzo = ref(null)
@@ -48,6 +54,8 @@ function pedirAtlas(clave, url) {
    (con fondo transparente) como única pieza, girada y a distinto tamaño en cada lugar. */
 const LADO_PIEZA = 110 // tamaño por defecto de una pieza propia, en las unidades de la pizza (lado 965)
 function recursoDe(ing) {
+  const bor = props.borradores.find((b) => b.ing.id === ing.id)
+  if (bor?.url) return { clave: `propia:borrador:${bor.url.length}:${bor.url.slice(-16)}`, url: bor.url, propia: true, borrador: true }
   const propia = imagenesIng.value[ing.id]
   if (propia) return { clave: `propia:${ing.id}:${propia.length}:${propia.slice(-16)}`, url: propia, propia: true }
   if (esDeFabrica(ing.id)) return { clave: ing.id, url: imgAtlas(ing.id), propia: false }
@@ -68,7 +76,7 @@ const cache = new Map()
 // Reparte las piezas con "mejor candidato": cada nueva se coloca lejos de las anteriores, sin rejilla visible.
 // Es estable mientras no cambie la semilla: al agregar otro ingrediente, los que ya estaban no se mueven.
 function colocar(slug, nSprites, base) {
-  if (cache.has(slug)) return cache.get(slug)
+  if (cache.has(slug) && cache.get(slug).base === base) return cache.get(slug)
   const rnd = azar(semilla(`${slug}:${props.semilla}`)), Rmax = meta.pizza.radio * 0.74
   const total = Math.round(base * (1.2 + rnd() * 0.2)) // piezas de sobra; la cantidad mostrada varía por pizza
   const densidad = 0.82 + rnd() * 0.36
@@ -85,6 +93,7 @@ function colocar(slug, nSprites, base) {
     out.push({ ...mejor, s: Math.floor(rnd() * nSprites), rot: rnd() * Math.PI * 2, esc: 0.92 + rnd() * 0.22 })
   }
   out.densidad = densidad
+  out.base = base
   cache.set(slug, out)
   return out
 }
@@ -93,9 +102,9 @@ function colocar(slug, nSprites, base) {
 // Los ingredientes nuevos entran en el nivel que les toca por su tipo (carne: medio; verdura: arriba) y siempre después de los de fábrica.
 function ordenCapas() {
   const rnd = azar(semilla(`orden:${props.semilla}`))
-  const nuevos = listaIng.value.filter((i) => !esDeFabrica(i.id)).sort((a, b) => (a.id < b.id ? -1 : 1))
+  const nuevos = ingEfectivos.value.filter((i) => !esDeFabrica(i.id)).sort((a, b) => (a.id < b.id ? -1 : 1))
   return NIVELES_CAPAS.flatMap((nivel, n) => {
-    const a = [...nivel.map((nombre) => listaIng.value.find((i) => i.nombre === nombre)).filter(Boolean),
+    const a = [...nivel.map((nombre) => ingEfectivos.value.find((i) => i.id === slugDe(nombre))).filter(Boolean),
       ...nuevos.filter((i) => (i.tipo === 'carne' ? 1 : 2) === n)]
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]] }
     return a
@@ -140,6 +149,7 @@ function pintar(ctx, W, final) {
   // ingredientes elegidos, en el orden de apilado
   const elegidos = ordenCapas().filter((i) => props.ingredientes.includes(i.nombre))
   const vigentes = new Set()
+  const usadosBorrador = new Set()
   let animando = false, pendiente = false
   const ALTO = W * 0.17 // desde qué altura "caen" las piezas
 
@@ -149,7 +159,9 @@ function pintar(ctx, W, final) {
     if (!rec) continue
     const slug = ing.id
     pedirAtlas(rec.clave, rec.url)
-    const im = atlas.get(rec.clave)
+    if (rec.borrador) usadosBorrador.add(rec.clave)
+    let im = atlas.get(rec.clave)
+    if (rec.borrador) { if (im && im !== 'error') ultimaBorrador = im; else if (ultimaBorrador) im = ultimaBorrador }
     if (!im || im === 'error') { pendiente = pendiente || im === null; continue }
     const defs = piezasDe(ing, rec, im), base = cantidadBase(ing, rec)
     const piezas = colocar(`${slug}:${rec.propia ? 'p' : 'f'}`, defs.length, base), n = Math.min(piezas.length, Math.max(1, Math.round(base * piezas.densidad * ESCASEZ)))
@@ -166,7 +178,7 @@ function pintar(ctx, W, final) {
       let alto = ALTO * (1 - caida) ** 2
       if (t > 0.7) alto = ALTO * 0.07 * Math.sin(Math.PI * ((t - 0.7) / 0.3))
       const aterrizada = t >= 0.7 ? 1 : 0
-      const e = p.esc * k * (1 + 0.16 * (1 - caida))
+      const e = p.esc * k * (1 + 0.16 * (1 - caida)) * (rec.propia || !ing.tam ? 1 : ing.tam / LADO_PIEZA) // tam 110 = normal; menor = más chico
       const x = c + p.x * k, y = c + p.y * k
 
       // aceite que suelta la carne sobre el queso
@@ -193,6 +205,7 @@ function pintar(ctx, W, final) {
     }
   }
   ctx.restore()
+  if (usadosBorrador.size) for (const k of [...atlas.keys()]) if (k.startsWith('propia:borrador:') && !usadosBorrador.has(k)) atlas.delete(k) // libera imágenes de borrador viejas
 
   // luz de horno: tono cálido, brillo del queso derretido y borde más oscuro para dar volumen
   if (elegidos.length || props.extras.length) {
@@ -240,6 +253,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => { observador?.disconnect(); cancelAnimationFrame(raf) })
 watch(() => [props.ingredientes.slice(), props.extras.slice()], programar, { deep: true })
+watch(() => props.borradores, programar, { deep: true })
 // Si el panel cambia la lista o las fotos, se vuelve a dibujar con lo nuevo.
 watch([listaIng, imagenesIng], () => { cache.clear(); programar() })
 // Pizza nueva: se vuelve a repartir todo y las piezas caen otra vez.
