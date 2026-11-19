@@ -7,6 +7,7 @@ import { authAdmin as auth, dbAdmin as db } from '../firebase/admin.js'
 import { correoDeTelefono } from '../firebase/claves.js'
 import { money } from '../data/menu.js'
 import { avisar } from '../store/toast.js'
+import { bloquearFondo } from '../utils/bloquearFondo.js'
 import Logo from '../components/Logo.vue'
 import Icono from '../components/Icono.vue'
 import AdminMenu from '../components/AdminMenu.vue'
@@ -294,6 +295,7 @@ async function cambiarEstado(p, nuevo) {
 }
 // Pasar de "preparando" a "en camino": primero se elige quién lo lleva. Admin y tienda también pueden cambiar de repartidor después.
 const asignando = ref(null) // { pedido, cambio: bool }
+bloquearFondo(() => asignando.value)
 const repartidores = ref([])
 const cargandoRep = ref(false)
 const errorRep = ref('')
@@ -525,8 +527,8 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 .adm-lista { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .pedido { margin: 0; border-left: 5px solid var(--borde); }
 .repartidor-linea { margin: 8px 0 0; }
-.asig { position: fixed; inset: 0; z-index: 70; background: #000b; display: flex; align-items: flex-end; justify-content: center; }
-.asig-caja { background: var(--fondo); border: 1px solid var(--borde); border-radius: 22px 22px 0 0; width: 100%; max-width: 480px; max-height: 88dvh; overflow-y: auto; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
+.asig { position: fixed; inset: 0; z-index: 70; background: #000b; display: flex; align-items: flex-end; justify-content: center; overscroll-behavior: contain; }
+.asig-caja { background: var(--fondo); border: 1px solid var(--borde); border-radius: 22px 22px 0 0; width: 100%; max-width: 480px; max-height: 88dvh; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
 .asig-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .asig-x { background: var(--sup2); border: 1px solid var(--borde); width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; }
 .asig-op { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--sup); border: 1.5px solid var(--borde); border-radius: 14px; padding: 14px; margin-bottom: 8px; min-height: 52px; }

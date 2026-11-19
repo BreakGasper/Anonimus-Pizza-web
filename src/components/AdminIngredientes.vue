@@ -7,6 +7,7 @@ import { INICIALES, normalizarIng, esDeFabrica, aplicarLista, aplicarImagenes } 
 import { imgIconoSlug } from '../data/imagenes.js'
 import { leerFuente, tieneTransparencia, procesar, ErrorImagenIng} from '../utils/recorte.js'
 import { avisar } from '../store/toast.js'
+import { bloquearFondo } from '../utils/bloquearFondo.js'
 
 defineProps({ puedeRestablecer: Boolean })
 
@@ -62,6 +63,7 @@ async function restablecer() {
 
 /* ---------- Editor ---------- */
 const ed = ref(null)
+bloquearFondo(() => ed.value)
 const nombreOcupado = (n, id) => lista.value.some((x) => x.id !== id && x.nombre.toLowerCase() === n.toLowerCase())
 function abrir(ing) {
   error.value = ''
@@ -217,8 +219,8 @@ async function guardarEditor() {
 .ig-foto { width: 56px; height: 56px; border-radius: 12px; display: grid; place-items: center; flex: none; overflow: hidden; }
 .ig-foto img, .ig-previa img { width: 100%; height: 100%; object-fit: contain; }
 .ig-acc { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
-.ig-modal { position: fixed; inset: 0; z-index: 70; background: #000b; display: flex; align-items: flex-end; justify-content: center; }
-.ig-caja { background: var(--fondo); border: 1px solid var(--borde); border-radius: 22px 22px 0 0; width: 100%; max-width: 560px; max-height: 94dvh; overflow-y: auto; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
+.ig-modal { position: fixed; inset: 0; z-index: 70; background: #000b; display: flex; align-items: flex-end; justify-content: center; overscroll-behavior: contain; }
+.ig-caja { background: var(--fondo); border: 1px solid var(--borde); border-radius: 22px 22px 0 0; width: 100%; max-width: 560px; max-height: 94dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; padding: 18px 16px 0; }
 .ig-mcab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .ig-x { background: var(--sup2); border: 1px solid var(--borde); width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; }
 .ig-caja .campo input[type=text], .ig-caja .campo input:not([type]), .ig-caja .campo select { width: 100%; }
@@ -230,6 +232,6 @@ async function guardarEditor() {
 .ig-foto-acc { display: grid; gap: 8px; justify-items: start; }
 .ig-pizza { position: relative; width: 150px; height: 150px; margin: 0 auto 12px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f6c768, #d9902f 70%, #b86f1c); box-shadow: 0 6px 14px #000a; overflow: hidden; }
 .ig-pizza img { position: absolute; width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 2px 2px #0007); }
-.ig-pie { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; }
+.ig-pie { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; position: sticky; bottom: 0; background: var(--fondo); border-top: 1px solid var(--borde); padding: 12px 0 calc(14px + env(safe-area-inset-bottom, 0px)); }
 @media (min-width: 640px) { .ig-modal { align-items: center; } .ig-caja { border-radius: 22px; } }
 </style>

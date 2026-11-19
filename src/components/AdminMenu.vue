@@ -3,6 +3,7 @@ import { ref, computed, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { doc, onSnapshot, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore'
 import Icono from './Icono.vue'
 import { ICONOS_PRODUCTO, iconoProducto } from '../utils/iconos.js'
+import { bloquearFondo } from '../utils/bloquearFondo.js'
 import { ingredientes as ingredientesTodos } from '../store/ingredientes.js'
 import { dbAdmin as db } from '../firebase/admin.js'
 import { MENU_INICIAL, ARMA, money, TITULOS_CATEGORIA } from '../data/menu.js'
@@ -130,6 +131,7 @@ const nuevoId = (tipo) => `${tipo.slice(0, 3)}-${Date.now().toString(36)}${Math.
 
 /* ---------- Editor ---------- */
 const ed = ref(null)
+bloquearFondo(() => ed.value)
 const errEd = ref('')
 const refNombre = ref(null)
 const modoFoto = ref('ninguna')
@@ -372,8 +374,8 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
 .previa img { width: 100%; height: 100%; object-fit: cover; }
 .subida-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .archivo { cursor: pointer; }
-.modal { position: fixed; inset: 0; z-index: 60; background: #000a; display: flex; align-items: flex-end; justify-content: center; padding: 0; }
-.modal-caja { background: var(--fondo); border: 1px solid var(--borde); border-radius: 22px 22px 0 0; width: 100%; max-width: 640px; max-height: 94dvh; overflow-y: auto; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
+.modal { position: fixed; inset: 0; z-index: 60; background: #000a; display: flex; align-items: flex-end; justify-content: center; padding: 0; overscroll-behavior: contain; }
+.modal-caja { background: var(--fondo); border: 1px solid var(--borde); border-radius: 22px 22px 0 0; width: 100%; max-width: 640px; max-height: 94dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; padding: 18px 16px 0; }
 .modal-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; position: sticky; top: -18px; background: var(--fondo); padding: 4px 0 8px; z-index: 1; }
 .cerrar { background: var(--sup2); border: 1px solid var(--borde); width: 38px; height: 38px; border-radius: 50%; font-size: 1rem; }
 .dos { display: grid; grid-template-columns: 1fr; gap: 0 12px; }
@@ -385,7 +387,7 @@ const descuento = computed(() => { const e = ed.value; if (!e || !e.enPromo) ret
 .biblio { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; margin-top: 10px; }
 .bib { background: var(--sup); border: 2px solid var(--borde); border-radius: 12px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: .72rem; }
 .bib.on { border-color: var(--ambar); background: #3a2610; } .bib img { border-radius: 50%; object-fit: cover; }
-.modal-pie { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+.modal-pie { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; position: sticky; bottom: 0; background: var(--fondo); border-top: 1px solid var(--borde); padding: 12px 0 calc(14px + env(safe-area-inset-bottom, 0px)); }
 .modal select { width: 100%; margin-top: 5px; padding: 13px 14px; border: 1.5px solid var(--borde); border-radius: 12px; background: var(--sup); color: var(--texto); font-family: inherit; }
 @media (min-width: 720px) {
   .modal { align-items: center; padding: 20px; } .modal-caja { border-radius: 22px; }
