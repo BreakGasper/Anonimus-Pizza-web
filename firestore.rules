@@ -122,6 +122,16 @@ service cloud.firestore {
                    && request.resource.data.fotos.size() <= 20;
     }
 
+    // Ingredientes de "Arma tu pizza": la lista (nombre, tipo, si está activo) y sus imágenes con fondo transparente
+    // (texto base64 dentro del mismo documento). Topes: 40 ingredientes y 24 imágenes propias. Admin y tienda.
+    match /config/ingredientes {
+      allow write: if (esAdmin() || esTienda())
+                   && request.resource.data.lista is list
+                   && request.resource.data.lista.size() <= 40
+                   && request.resource.data.imagenes is map
+                   && request.resource.data.imagenes.size() <= 24;
+    }
+
     // Todo lo demás, cerrado.
     match /{document=**} {
       allow read, write: if false;

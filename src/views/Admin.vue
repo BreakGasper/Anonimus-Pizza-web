@@ -10,6 +10,7 @@ import { avisar } from '../store/toast.js'
 import Logo from '../components/Logo.vue'
 import Icono from '../components/Icono.vue'
 import AdminMenu from '../components/AdminMenu.vue'
+import AdminIngredientes from '../components/AdminIngredientes.vue'
 import AdminUsuarios from '../components/AdminUsuarios.vue'
 
 /* ---------- Sesión ---------- */
@@ -399,6 +400,7 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
           <button :class="{ on: pestana === 'pedidos' }" @click="pestana = 'pedidos'">Pedidos <b v-if="nuevos" class="punto">{{ nuevos }}</b></button>
           <button v-if="esAdminRol" :class="{ on: pestana === 'resumen' }" @click="pestana = 'resumen'">Resumen</button>
           <button v-if="puedeGestionar" :class="{ on: pestana === 'menu' }" @click="pestana = 'menu'">Menú</button>
+          <button v-if="puedeGestionar" :class="{ on: pestana === 'ingredientes' }" @click="pestana = 'ingredientes'">Ingredientes</button>
           <button v-if="esAdminRol" :class="{ on: pestana === 'usuarios' }" @click="pestana = 'usuarios'">Usuarios</button>
         </nav>
         <h2 v-else-if="esRepartidorRol" style="margin:0 0 12px">Pedidos por entregar <small class="desc">· los que te asignó la tienda</small></h2>
@@ -482,6 +484,7 @@ const horaCancelado = (p) => (p.canceladoEn?.toDate ? p.canceladoEn.toDate().toL
 
         <!-- Menú de la tienda -->
         <AdminMenu v-else-if="pestana === 'menu' && puedeGestionar" :puede-restablecer="esAdminRol" />
+        <AdminIngredientes v-else-if="pestana === 'ingredientes' && puedeGestionar" :puede-restablecer="esAdminRol" />
 
         <!-- Usuarios (solo admin) -->
         <AdminUsuarios v-else-if="pestana === 'usuarios' && esAdminRol" :uid-actual="usuario.uid" />

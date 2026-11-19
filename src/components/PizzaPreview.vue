@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
-import { imgBase, urlSprites, imgAtlas, slugDe, NIVELES_CAPAS, PIEZAS } from '../data/imagenes.js'
+import { imgBase, urlSprites, imgAtlas, NIVELES_CAPAS, NIVEL_DE, PIEZAS } from '../data/imagenes.js'
+import { ingredientes as listaIng, imagenesIng, porNombre, esDeFabrica } from '../store/ingredientes.js'
 
 const props = defineProps({
   ingredientes: { type: Array, default: () => [] },
@@ -24,7 +25,7 @@ const listo = ref(false)
 /* ---------- Recursos (se cargan una vez y se reutilizan) ---------- */
 let meta = null
 let imgPizza = null
-const atlas = new Map() // slug -> HTMLImageElement | 'error'
+const atlas = new Map() // clave -> HTMLImageElement | 'error'
 
 function cargarImagen(url) {
   return new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = url })
@@ -36,11 +37,27 @@ async function cargarBase() {
   } catch { /* sin imágenes: se queda la pizza vacía */ }
   programar()
 }
-function pedirAtlas(slug) {
-  if (atlas.has(slug)) return
-  atlas.set(slug, null)
-  cargarImagen(imgAtlas(slug)).then((i) => atlas.set(slug, i)).catch(() => atlas.set(slug, 'error')).finally(programar)
+function pedirAtlas(clave, url) {
+  if (atlas.has(clave)) return
+  atlas.set(clave, null)
+  cargarImagen(url).then((i) => atlas.set(clave, i)).catch(() => atlas.set(clave, 'error')).finally(programar)
 }
+
+/* Un ingrediente de fábrica usa sus piezas recortadas (atlas); si el panel le puso foto, o es uno nuevo, se usa esa imagen
+   (con fondo transparente) como única pieza, girada y a distinto tamaño en cada lugar. */
+const LADO_PIEZA = 110 // tamaño por defecto de una pieza propia, en las unidades de la pizza (lado 965)
+function recursoDe(ing) {
+  const propia = imagenesIng.value[ing.id]
+  if (propia) return { clave: `propia:${ing.id}:${propia.length}:${propia.slice(-16)}`, url: propia, propia: true }
+  if (esDeFabrica(ing.id)) return { clave: ing.id, url: imgAtlas(ing.id), propia: false }
+  return null // ingrediente nuevo sin imagen: no se dibuja
+}
+function piezasDe(ing, r, im) {
+  if (!r.propia) return meta.ingredientes[ing.id].piezas
+  const lado = ing.tam || LADO_PIEZA, k = lado / Math.max(im.naturalWidth, im.naturalHeight)
+  return [{ x: 0, y: 0, w: im.naturalWidth, h: im.naturalHeight, dw: im.naturalWidth * k, dh: im.naturalHeight * k }]
+}
+const cantidadBase = (ing, r) => (r.propia ? (ing.piezas || (ing.tipo === 'carne' ? 16 : 20)) : (ing.piezas || PIEZAS[ing.id]))
 
 /* ---------- Colocación determinista de piezas ---------- */
 function semilla(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) } return h >>> 0 }
@@ -49,11 +66,10 @@ function azar(a) { return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a 
 const cache = new Map()
 // Reparte las piezas con "mejor candidato": cada nueva se coloca lejos de las anteriores, sin rejilla visible.
 // Es estable mientras no cambie la semilla: al agregar otro ingrediente, los que ya estaban no se mueven.
-function colocar(slug) {
+function colocar(slug, nSprites, base) {
   if (cache.has(slug)) return cache.get(slug)
-  const nSprites = meta.ingredientes[slug].piezas.length
   const rnd = azar(semilla(`${slug}:${props.semilla}`)), Rmax = meta.pizza.radio * 0.74
-  const total = Math.round(PIEZAS[slug] * (1.2 + rnd() * 0.2)) // piezas de sobra; la cantidad mostrada varía por pizza
+  const total = Math.round(base * (1.2 + rnd() * 0.2)) // piezas de sobra; la cantidad mostrada varía por pizza
   const densidad = 0.82 + rnd() * 0.36
   const out = []
   for (let i = 0; i < total; i++) {
@@ -73,10 +89,13 @@ function colocar(slug) {
 }
 
 // Orden de apilado al azar dentro de cada nivel (el nivel de abajo siempre queda abajo).
+// Los ingredientes nuevos entran en el nivel que les toca por su tipo (carne: medio; verdura: arriba) y siempre después de los de fábrica.
 function ordenCapas() {
   const rnd = azar(semilla(`orden:${props.semilla}`))
-  return NIVELES_CAPAS.flatMap((nivel) => {
-    const a = [...nivel]
+  const nuevos = listaIng.value.filter((i) => !esDeFabrica(i.id)).sort((a, b) => (a.id < b.id ? -1 : 1))
+  return NIVELES_CAPAS.flatMap((nivel, n) => {
+    const a = [...nivel.map((nombre) => listaIng.value.find((i) => i.nombre === nombre)).filter(Boolean),
+      ...nuevos.filter((i) => (i.tipo === 'carne' ? 1 : 2) === n)]
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]] }
     return a
   })
@@ -118,18 +137,21 @@ function pintar(ctx, W, final) {
   }
 
   // ingredientes elegidos, en el orden de apilado
-  const elegidos = ordenCapas().filter((n) => props.ingredientes.includes(n)).map(slugDe)
+  const elegidos = ordenCapas().filter((i) => props.ingredientes.includes(i.nombre))
   const vigentes = new Set()
   let animando = false, pendiente = false
   const ALTO = W * 0.17 // desde qué altura "caen" las piezas
 
   ctx.save()
-  for (const slug of elegidos) {
-    pedirAtlas(slug)
-    const im = atlas.get(slug)
+  for (const ing of elegidos) {
+    const rec = recursoDe(ing)
+    if (!rec) continue
+    const slug = ing.id
+    pedirAtlas(rec.clave, rec.url)
+    const im = atlas.get(rec.clave)
     if (!im || im === 'error') { pendiente = pendiente || im === null; continue }
-    const piezas = colocar(slug), n = Math.min(piezas.length, Math.max(1, Math.round(PIEZAS[slug] * piezas.densidad * ESCASEZ)))
-    const defs = meta.ingredientes[slug].piezas
+    const defs = piezasDe(ing, rec, im), base = cantidadBase(ing, rec)
+    const piezas = colocar(`${slug}:${rec.propia ? 'p' : 'f'}`, defs.length, base), n = Math.min(piezas.length, Math.max(1, Math.round(base * piezas.densidad * ESCASEZ)))
     let nuevas = 0
     for (let i = 0; i < n; i++) {
       const p = piezas[i], d = defs[p.s], clave = `${slug}:${i}`
@@ -147,9 +169,10 @@ function pintar(ctx, W, final) {
       const x = c + p.x * k, y = c + p.y * k
 
       // aceite que suelta la carne sobre el queso
-      const halo = HALO[slug]
+      const halo = rec.propia ? (ing.tipo === 'carne' ? 0.25 : 0) : HALO[slug]
+      const dw = d.dw ?? d.w, dh = d.dh ?? d.h
       if (halo && aterrizada) {
-        const r = Math.max(d.w, d.h) * e * 0.62
+        const r = Math.max(dw, dh) * e * 0.62
         const g = ctx.createRadialGradient(x, y, r * 0.35, x, y, r)
         g.addColorStop(0, `rgba(235,125,25,${halo})`); g.addColorStop(1, 'rgba(235,125,25,0)')
         ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = g
@@ -164,7 +187,7 @@ function pintar(ctx, W, final) {
       ctx.translate(x, y - alto)
       ctx.rotate(p.rot)
       ctx.scale(e, e)
-      ctx.drawImage(im, d.x, d.y, d.w, d.h, -d.w / 2, -d.h / 2, d.w, d.h)
+      ctx.drawImage(im, d.x, d.y, d.w, d.h, -dw / 2, -dh / 2, dw, dh)
       ctx.restore()
     }
   }
@@ -216,6 +239,8 @@ onMounted(() => {
 })
 onBeforeUnmount(() => { observador?.disconnect(); cancelAnimationFrame(raf) })
 watch(() => [props.ingredientes.slice(), props.extras.slice()], programar, { deep: true })
+// Si el panel cambia la lista o las fotos, se vuelve a dibujar con lo nuevo.
+watch([listaIng, imagenesIng], () => { cache.clear(); programar() })
 // Pizza nueva: se vuelve a repartir todo y las piezas caen otra vez.
 watch(() => props.semilla, () => { cache.clear(); vistos.clear(); programar() })
 </script>
